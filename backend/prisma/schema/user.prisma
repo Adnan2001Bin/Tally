@@ -1,0 +1,19 @@
+/// Application user — identity, credentials, and profile preferences.
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  email          String   @unique
+  phone          String?  @unique
+  password_hash  String
+  username       String   @unique
+  full_name      String
+  profile_image  String?
+  currency       String   @default("USD") @db.VarChar(3)
+  language       String   @default("en") @db.VarChar(10)
+  email_verified Boolean  @default(false)
+  created_at     DateTime @default(now()) @db.Timestamptz
+  updated_at     DateTime @updatedAt @db.Timestamptz
+
+  auth_sessions AuthSession[]
+
+  @@map("users")
+}

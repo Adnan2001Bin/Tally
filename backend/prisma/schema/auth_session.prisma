@@ -1,0 +1,17 @@
+/// Refresh-token session for JWT rotation and device tracking.
+model AuthSession {
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String   @db.Uuid
+  refresh_token String   @unique @db.Text
+  device_name   String?  @db.VarChar(255)
+  ip_address    String?  @db.VarChar(45)
+  user_agent    String?  @db.Text
+  expires_at    DateTime @db.Timestamptz
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("auth_sessions")
+}
