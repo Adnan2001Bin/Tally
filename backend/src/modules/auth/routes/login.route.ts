@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { authResponseSchema, errorResponseSchema, loginBodySchema } from "../auth.schemas.js";
+import { authResponseSchema, authTag, errorResponseSchema, loginBodySchema } from "../auth.schemas.js";
 import { loginUser } from "../services/login.service.js";
 import type { SignAccessToken } from "../services/token.service.js";
 import { getDeviceMeta, handleAuthError } from "../utils/route-helpers.js";
@@ -9,6 +9,8 @@ export function loginRoute(app: FastifyInstance, signToken: SignAccessToken) {
     "/login",
     {
       schema: {
+        tags: [authTag],
+        description: "Authenticate with email and password",
         body: loginBodySchema,
         response: {
           200: authResponseSchema,

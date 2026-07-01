@@ -1,6 +1,9 @@
 export const emailPattern = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$";
 export const usernamePattern = "^[a-zA-Z0-9_]{3,30}$";
 
+export const authTag = "Auth";
+export const bearerAuthSecurity = [{ bearerAuth: [] }] as const;
+
 export const registerBodySchema = {
   type: "object",
   required: ["email", "password", "username"],

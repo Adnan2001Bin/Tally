@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import {
+  authTag,
+  bearerAuthSecurity,
   errorResponseSchema,
   revokeAllQuerySchema,
   sessionIdParamsSchema,
@@ -20,6 +22,9 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        tags: [authTag],
+        description: "List all active sessions for the authenticated user",
+        security: bearerAuthSecurity,
         response: {
           200: {
             type: "object",
@@ -52,6 +57,9 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        tags: [authTag],
+        description: "Get a single session by id",
+        security: bearerAuthSecurity,
         params: sessionIdParamsSchema,
         response: {
           200: {
@@ -84,6 +92,9 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        tags: [authTag],
+        description: "Revoke all sessions; keep_current defaults to true",
+        security: bearerAuthSecurity,
         querystring: revokeAllQuerySchema,
         response: {
           200: {
@@ -119,6 +130,9 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        tags: [authTag],
+        description: "Revoke a specific session by id",
+        security: bearerAuthSecurity,
         params: sessionIdParamsSchema,
         response: {
           204: { type: "null" },

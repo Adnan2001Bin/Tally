@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { authResponseSchema, errorResponseSchema, registerBodySchema } from "../auth.schemas.js";
+import { authResponseSchema, authTag, errorResponseSchema, registerBodySchema } from "../auth.schemas.js";
 import { registerUser } from "../services/register.service.js";
 import type { SignAccessToken } from "../services/token.service.js";
 import { getDeviceMeta, handleAuthError } from "../utils/route-helpers.js";
@@ -9,6 +9,8 @@ export function registerRoute(app: FastifyInstance, signToken: SignAccessToken) 
     "/register",
     {
       schema: {
+        tags: [authTag],
+        description: "Create a new user account and issue access + refresh tokens",
         body: registerBodySchema,
         response: {
           201: authResponseSchema,

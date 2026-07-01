@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { authResponseSchema, errorResponseSchema, refreshBodySchema } from "../auth.schemas.js";
+import { authResponseSchema, authTag, errorResponseSchema, refreshBodySchema } from "../auth.schemas.js";
 import { refreshTokens } from "../services/refresh.service.js";
 import type { SignAccessToken } from "../services/token.service.js";
 import { handleAuthError } from "../utils/route-helpers.js";
@@ -9,6 +9,8 @@ export function refreshRoute(app: FastifyInstance, signToken: SignAccessToken) {
     "/refresh",
     {
       schema: {
+        tags: [authTag],
+        description: "Rotate refresh token and issue a new access token",
         body: refreshBodySchema,
         response: {
           200: authResponseSchema,

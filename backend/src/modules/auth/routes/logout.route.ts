@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { logoutBodySchema } from "../auth.schemas.js";
+import { authTag, logoutBodySchema } from "../auth.schemas.js";
 import { logoutByRefreshToken } from "../services/logout.service.js";
 
 export function logoutRoute(app: FastifyInstance) {
@@ -7,6 +7,8 @@ export function logoutRoute(app: FastifyInstance) {
     "/logout",
     {
       schema: {
+        tags: [authTag],
+        description: "Revoke the session tied to the given refresh token",
         body: logoutBodySchema,
         response: {
           204: { type: "null" },
