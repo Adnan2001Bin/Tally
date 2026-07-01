@@ -8,7 +8,6 @@ export type UserCreateInput = {
   email: string;
   password_hash: string;
   username: string;
-  full_name: string;
   phone?: string | null;
   profile_image?: string | null;
   currency?: string;
@@ -19,7 +18,7 @@ export type UserCreateInput = {
 export type UserUpdateInput = Partial<
   Pick<
     PrismaUser,
-    "phone" | "username" | "full_name" | "profile_image" | "currency" | "language"
+    "phone" | "username" | "profile_image" | "currency" | "language"
   >
 >;
 

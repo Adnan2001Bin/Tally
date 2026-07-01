@@ -2,6 +2,14 @@ import type { AuthSession as PrismaAuthSession } from "@prisma/client";
 
 export type AuthSession = PrismaAuthSession;
 
+/** Session fields safe to return from the API. */
+export type SessionPublic = Omit<PrismaAuthSession, "refresh_token">;
+
+export function toPublicSession(session: PrismaAuthSession): SessionPublic {
+  const { refresh_token: _, ...publicSession } = session;
+  return publicSession;
+}
+
 /** Payload used when issuing a new refresh session. */
 export type AuthSessionCreateInput = {
   user_id: string;

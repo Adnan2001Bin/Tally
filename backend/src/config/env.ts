@@ -16,7 +16,7 @@ export const env = {
   jwt: {
     accessSecret: requireEnv("JWT_ACCESS_SECRET"),
     refreshSecret: requireEnv("JWT_REFRESH_SECRET"),
-    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "5m",
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "7d",
   },
   isProduction: process.env.NODE_ENV === "production",
