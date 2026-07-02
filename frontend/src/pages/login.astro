@@ -1,0 +1,25 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import LoginApp from "../components/auth/login/LoginApp";
+---
+
+<BaseLayout>
+  <LoginApp client:only="react">
+    <div
+      slot="fallback"
+      class="flex min-h-dvh items-stretch justify-center bg-[#0f0f0f]"
+    >
+      <div
+        class="mx-auto flex min-h-dvh w-full max-w-[420px] flex-col justify-center bg-canvas px-[30px] text-ink shadow-2xl"
+      >
+        <div class="mb-[26px] text-center">
+          <div class="mx-auto mb-4 flex h-[60px] w-[60px] items-center justify-center rounded-logo bg-ink">
+            <span class="font-serif text-[34px] text-canvas">৳</span>
+          </div>
+          <h1 class="font-serif text-[40px] leading-[1.02]">Welcome back</h1>
+          <p class="mt-1 font-serif text-base italic text-muted">Tally · one ledger, two lenses</p>
+        </div>
+      </div>
+    </div>
+  </LoginApp>
+</BaseLayout>
