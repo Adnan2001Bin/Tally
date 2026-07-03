@@ -4,6 +4,34 @@ export const usernamePattern = "^[a-zA-Z0-9_]{3,30}$";
 export const authTag = "Auth";
 export const bearerAuthSecurity = [{ bearerAuth: [] }] as const;
 
+/** Short OpenAPI operationIds — Orval uses these for function/type names. */
+export const authOperationIds = {
+  register: "register",
+  login: "login",
+  refresh: "refresh",
+  logout: "logout",
+  listSessions: "listSessions",
+  getSession: "getSession",
+  revokeAllSessions: "revokeAllSessions",
+  revokeSession: "revokeSession",
+} as const;
+
+export const schemaRef = {
+  registerBody: "RegisterBody",
+  loginBody: "LoginBody",
+  refreshBody: "RefreshBody",
+  logoutBody: "LogoutBody",
+  authResponse: "AuthResponse",
+  apiError: "ApiError",
+  session: "Session",
+  sessionsList: "SessionsList",
+  revokeAllSessions: "RevokeAllSessionsResponse",
+  sessionDetail: "SessionDetail",
+  sessionIdParams: "SessionIdParams",
+  revokeAllParams: "RevokeAllSessionsParams",
+  health: "HealthResponse",
+} as const;
+
 export const registerBodySchema = {
   type: "object",
   required: ["email", "password", "username"],

@@ -8,7 +8,7 @@
     "dev": "node scripts/clean.mjs && astro dev --force",
     "build": "astro build",
     "preview": "astro preview",
-    "api:generate": "orval && node scripts/organize-models.mjs",
+    "api:generate": "node scripts/clean-models.mjs && orval && node scripts/organize-models.mjs && node scripts/rename-schemas.mjs",
     "check": "astro check"
   },
   "dependencies": {

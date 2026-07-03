@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { authTag, logoutBodySchema } from "../auth.schemas.js";
+import { ref } from "../../../plugins/swagger.js";
+import { authOperationIds, authTag, schemaRef } from "../auth.schemas.js";
 import { logoutByRefreshToken } from "../services/logout.service.js";
 
 export function logoutRoute(app: FastifyInstance) {
@@ -7,9 +8,10 @@ export function logoutRoute(app: FastifyInstance) {
     "/logout",
     {
       schema: {
+        operationId: authOperationIds.logout,
         tags: [authTag],
         description: "Revoke the session tied to the given refresh token",
-        body: logoutBodySchema,
+        body: ref(schemaRef.logoutBody),
         response: {
           204: { type: "null" },
         },

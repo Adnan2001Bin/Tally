@@ -1,11 +1,10 @@
 import type { FastifyInstance } from "fastify";
+import { ref } from "../../../plugins/swagger.js";
 import {
+  authOperationIds,
   authTag,
   bearerAuthSecurity,
-  errorResponseSchema,
-  revokeAllQuerySchema,
-  sessionIdParamsSchema,
-  sessionPublicSchema,
+  schemaRef,
 } from "../auth.schemas.js";
 import {
   assertActiveSessionForUser,
@@ -22,20 +21,13 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: authOperationIds.listSessions,
         tags: [authTag],
         description: "List all active sessions for the authenticated user",
         security: bearerAuthSecurity,
         response: {
-          200: {
-            type: "object",
-            properties: {
-              sessions: {
-                type: "array",
-                items: sessionPublicSchema,
-              },
-            },
-          },
-          401: errorResponseSchema,
+          200: ref(schemaRef.sessionsList),
+          401: ref(schemaRef.apiError),
         },
       },
     },
@@ -57,19 +49,15 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: authOperationIds.getSession,
         tags: [authTag],
         description: "Get a single session by id",
         security: bearerAuthSecurity,
-        params: sessionIdParamsSchema,
+        params: ref(schemaRef.sessionIdParams),
         response: {
-          200: {
-            type: "object",
-            properties: {
-              session: sessionPublicSchema,
-            },
-          },
-          401: errorResponseSchema,
-          404: errorResponseSchema,
+          200: ref(schemaRef.sessionDetail),
+          401: ref(schemaRef.apiError),
+          404: ref(schemaRef.apiError),
         },
       },
     },
@@ -92,18 +80,14 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: authOperationIds.revokeAllSessions,
         tags: [authTag],
         description: "Revoke all sessions; keep_current defaults to true",
         security: bearerAuthSecurity,
-        querystring: revokeAllQuerySchema,
+        querystring: ref(schemaRef.revokeAllParams),
         response: {
-          200: {
-            type: "object",
-            properties: {
-              revoked_count: { type: "number" },
-            },
-          },
-          401: errorResponseSchema,
+          200: ref(schemaRef.revokeAllSessions),
+          401: ref(schemaRef.apiError),
         },
       },
     },
@@ -130,14 +114,15 @@ export function sessionsRoutes(app: FastifyInstance) {
     {
       preHandler: [app.authenticate],
       schema: {
+        operationId: authOperationIds.revokeSession,
         tags: [authTag],
         description: "Revoke a specific session by id",
         security: bearerAuthSecurity,
-        params: sessionIdParamsSchema,
+        params: ref(schemaRef.sessionIdParams),
         response: {
           204: { type: "null" },
-          401: errorResponseSchema,
-          404: errorResponseSchema,
+          401: ref(schemaRef.apiError),
+          404: ref(schemaRef.apiError),
         },
       },
     },

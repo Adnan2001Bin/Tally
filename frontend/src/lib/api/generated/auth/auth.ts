@@ -6,17 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
-  DeleteAuthSessions200,
-  DeleteAuthSessionsParams,
-  GetAuthSessions200,
-  GetAuthSessionsSessionId200,
-  PostAuthLogin200,
-  PostAuthLoginBody,
-  PostAuthLogoutBody,
-  PostAuthRefresh200,
-  PostAuthRefreshBody,
-  PostAuthRegister201,
-  PostAuthRegisterBody
+  RegisterBody,
+  LoginBody,
+  SessionsList,
+  SessionDetail,
+  RevokeAllSessionsResponse,
+  RefreshBody,
+  LogoutBody,
+  AuthResponse,
+  RevokeAllSessionsParams
 } from '../../models';
 
 import { customInstance } from '../../axios-instance';
@@ -27,62 +25,62 @@ import { customInstance } from '../../axios-instance';
 /**
  * Create a new user account and issue access + refresh tokens
  */
-const postAuthRegister = (
-    postAuthRegisterBody: PostAuthRegisterBody,
+const register = (
+    def0: RegisterBody,
  ) => {
-      return customInstance<PostAuthRegister201>(
+      return customInstance<AuthResponse>(
       {url: `/auth/register`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: postAuthRegisterBody
+      data: def0
     },
       );
     }
   /**
  * Authenticate with email and password
  */
-const postAuthLogin = (
-    postAuthLoginBody: PostAuthLoginBody,
+const login = (
+    def1: LoginBody,
  ) => {
-      return customInstance<PostAuthLogin200>(
+      return customInstance<AuthResponse>(
       {url: `/auth/login`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: postAuthLoginBody
+      data: def1
     },
       );
     }
   /**
  * Rotate refresh token and issue a new access token
  */
-const postAuthRefresh = (
-    postAuthRefreshBody: PostAuthRefreshBody,
+const refresh = (
+    def2: RefreshBody,
  ) => {
-      return customInstance<PostAuthRefresh200>(
+      return customInstance<AuthResponse>(
       {url: `/auth/refresh`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: postAuthRefreshBody
+      data: def2
     },
       );
     }
   /**
  * Revoke the session tied to the given refresh token
  */
-const postAuthLogout = (
-    postAuthLogoutBody: PostAuthLogoutBody,
+const logout = (
+    def3: LogoutBody,
  ) => {
       return customInstance<void>(
       {url: `/auth/logout`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: postAuthLogoutBody
+      data: def3
     },
       );
     }
   /**
  * List all active sessions for the authenticated user
  */
-const getAuthSessions = (
+const listSessions = (
     
  ) => {
-      return customInstance<GetAuthSessions200>(
+      return customInstance<SessionsList>(
       {url: `/auth/sessions`, method: 'GET'
     },
       );
@@ -90,10 +88,10 @@ const getAuthSessions = (
   /**
  * Revoke all sessions; keep_current defaults to true
  */
-const deleteAuthSessions = (
-    params?: DeleteAuthSessionsParams,
+const revokeAllSessions = (
+    params?: RevokeAllSessionsParams,
  ) => {
-      return customInstance<DeleteAuthSessions200>(
+      return customInstance<RevokeAllSessionsResponse>(
       {url: `/auth/sessions`, method: 'DELETE',
         params
     },
@@ -102,10 +100,10 @@ const deleteAuthSessions = (
   /**
  * Get a single session by id
  */
-const getAuthSessionsSessionId = (
+const getSession = (
     sessionId: string,
  ) => {
-      return customInstance<GetAuthSessionsSessionId200>(
+      return customInstance<SessionDetail>(
       {url: `/auth/sessions/${sessionId}`, method: 'GET'
     },
       );
@@ -113,7 +111,7 @@ const getAuthSessionsSessionId = (
   /**
  * Revoke a specific session by id
  */
-const deleteAuthSessionsSessionId = (
+const revokeSession = (
     sessionId: string,
  ) => {
       return customInstance<void>(
@@ -121,12 +119,12 @@ const deleteAuthSessionsSessionId = (
     },
       );
     }
-  return {postAuthRegister,postAuthLogin,postAuthRefresh,postAuthLogout,getAuthSessions,deleteAuthSessions,getAuthSessionsSessionId,deleteAuthSessionsSessionId}};
-export type PostAuthRegisterResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['postAuthRegister']>>>
-export type PostAuthLoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['postAuthLogin']>>>
-export type PostAuthRefreshResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['postAuthRefresh']>>>
-export type PostAuthLogoutResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['postAuthLogout']>>>
-export type GetAuthSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['getAuthSessions']>>>
-export type DeleteAuthSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['deleteAuthSessions']>>>
-export type GetAuthSessionsSessionIdResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['getAuthSessionsSessionId']>>>
-export type DeleteAuthSessionsSessionIdResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['deleteAuthSessionsSessionId']>>>
+  return {register,login,refresh,logout,listSessions,revokeAllSessions,getSession,revokeSession}};
+export type RegisterResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['register']>>>
+export type LoginResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['login']>>>
+export type RefreshResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['refresh']>>>
+export type LogoutResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['logout']>>>
+export type ListSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['listSessions']>>>
+export type RevokeAllSessionsResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['revokeAllSessions']>>>
+export type GetSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['getSession']>>>
+export type RevokeSessionResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>['revokeSession']>>>

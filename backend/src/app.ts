@@ -2,8 +2,9 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwtPlugin from "./plugins/jwt.js";
 import authenticatePlugin from "./plugins/authenticate.js";
-import swaggerPlugin from "./plugins/swagger.js";
+import swaggerPlugin, { ref } from "./plugins/swagger.js";
 import { registerRoutes } from "./routes/index.js";
+import { schemaRef } from "./modules/auth/auth.schemas.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -25,16 +26,11 @@ export async function buildApp() {
     "/health",
     {
       schema: {
+        operationId: "health",
         tags: ["Health"],
         description: "Check that the API is running",
         response: {
-          200: {
-            type: "object",
-            properties: {
-              status: { type: "string" },
-              timestamp: { type: "string", format: "date-time" },
-            },
-          },
+          200: ref(schemaRef.health),
         },
       },
     },

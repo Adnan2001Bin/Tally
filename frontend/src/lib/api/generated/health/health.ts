@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type {
-  GetHealth200
+  HealthResponse
 } from '../../models';
 
 import { customInstance } from '../../axios-instance';
@@ -17,13 +17,13 @@ import { customInstance } from '../../axios-instance';
 /**
  * Check that the API is running
  */
-const getHealth = (
+const health = (
     
  ) => {
-      return customInstance<GetHealth200>(
+      return customInstance<HealthResponse>(
       {url: `/health`, method: 'GET'
     },
       );
     }
-  return {getHealth}};
-export type GetHealthResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getHealth>['getHealth']>>>
+  return {health}};
+export type HealthResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getHealth>['health']>>>

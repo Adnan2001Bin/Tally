@@ -1,15 +1,18 @@
-import type { PostAuthLogin200 } from "@/lib/api/models";
+import type { AuthResponse } from "@/lib/api/types";
 
 const ACCESS_TOKEN_KEY = "tally_access_token";
 const REFRESH_TOKEN_KEY = "tally_refresh_token";
 const USER_KEY = "tally_user";
 
-export type AuthSession = PostAuthLogin200;
+export type AuthSession = AuthResponse;
 
 export function saveAuthSession(response: AuthSession): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, response.access_token);
-  localStorage.setItem(REFRESH_TOKEN_KEY, response.refresh_token);
-  localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+  const { access_token, refresh_token, user } = response;
+  if (!access_token || !refresh_token) return;
+
+  localStorage.setItem(ACCESS_TOKEN_KEY, access_token);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function clearAuthSession(): void {
