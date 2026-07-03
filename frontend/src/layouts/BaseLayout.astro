@@ -1,5 +1,11 @@
 ---
 import "../styles/global.css";
+
+type Props = {
+  title?: string;
+};
+
+const { title = "Tally" } = Astro.props;
 ---
 
 <!doctype html>
@@ -15,7 +21,7 @@ import "../styles/global.css";
       rel="stylesheet"
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Tally</title>
+    <title>{title}</title>
   </head>
   <body>
     <slot />

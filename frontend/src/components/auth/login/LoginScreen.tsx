@@ -4,6 +4,7 @@ import { LoginHeader } from "@/components/auth/login/LoginHeader";
 import { ModeToggle, type AuthMode } from "@/components/auth/login/ModeToggle";
 import { RegisterForm } from "@/components/auth/login/RegisterForm";
 import { SignInForm } from "@/components/auth/login/SignInForm";
+import { redirectToApp } from "@/lib/auth/auth-routes";
 import { useState } from "react";
 
 export function LoginScreen() {
@@ -13,8 +14,8 @@ export function LoginScreen() {
     setMode(next);
   };
 
-  const goHome = () => {
-    window.location.href = "/";
+  const goApp = () => {
+    redirectToApp();
   };
 
   const handleDemo = () => {
@@ -30,9 +31,9 @@ export function LoginScreen() {
       <ModeToggle mode={mode} onChange={switchMode} />
 
       {mode === "create" ? (
-        <RegisterForm onSwitchToSignIn={() => switchMode("signin")} onSuccess={goHome} />
+        <RegisterForm onSwitchToSignIn={() => switchMode("signin")} onSuccess={goApp} />
       ) : (
-        <SignInForm onSwitchToCreate={() => switchMode("create")} onSuccess={goHome} />
+        <SignInForm onSwitchToCreate={() => switchMode("create")} onSuccess={goApp} />
       )}
 
       <AuthDivider />

@@ -1,0 +1,15 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import AppApp from "../../components/app/AppApp";
+---
+
+<BaseLayout title="Tally · App">
+  <AppApp client:only="react">
+    <div
+      slot="fallback"
+      class="flex min-h-dvh items-center justify-center bg-[#0f0f0f] text-white/70"
+    >
+      Loading app…
+    </div>
+  </AppApp>
+</BaseLayout>
