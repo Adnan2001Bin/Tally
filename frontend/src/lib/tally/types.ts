@@ -1,4 +1,4 @@
-// UI-layer types (the demo/view model). Money math types live in @/lib/core.
+// UI-layer types. Money math types live in @/lib/core.
 
 export type Screen =
   | "home"
@@ -20,7 +20,7 @@ export type Screen =
 
 export interface GroupMember {
   name: string;
-  net: number; // demo: pre-derived net position (positive = group owes them)
+  net: number; // positive = group owes them
 }
 
 export interface Group {
@@ -47,6 +47,8 @@ export interface Entry {
   kind: EntryKind;
   note?: string;
   fresh?: boolean;
+  /** ISO timestamp — used for charts when synced from the API. */
+  at?: string;
   // shared-only
   total?: number;
   paidBy?: string;
@@ -127,6 +129,8 @@ export interface TallyState {
   toast: string | null;
   paid: Record<string, boolean>;
   extraEntries: Entry[];
+  /** Personal expenses loaded from the API. */
+  apiPersonalEntries: Entry[];
   returned: Record<string, boolean>;
   cleared: Record<string, boolean>;
   mealMembers: MealMember[];
@@ -139,7 +143,7 @@ export interface TallyState {
   offline: boolean;
   entry: Entry | null;
   lastScreen: Screen;
-  // demo data lives in state so create/borrow mutations re-render
+  // user-created entries live in state until group/shared APIs are wired
   groups: Group[];
   loans: Loan[];
   things: Thing[];

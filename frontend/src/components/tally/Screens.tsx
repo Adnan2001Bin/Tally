@@ -80,7 +80,10 @@ export function Spending() {
           <span style={{ fontSize: 30, color: "var(--muted)" }}>৳</span>{vm.spendTotalText}
         </div>
         <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>
-          this month · <span style={{ color: "#C2693E" }}>incl. {vm.spendSharedText} from shared</span>
+          this month
+          {vm.spendShared > 0 && (
+            <> · <span style={{ color: "#C2693E" }}>incl. {vm.spendSharedText} from shared</span></>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 9, height: 56, marginTop: 24 }}>
           {vm.weeks.map((w, i) => (<div key={i} style={{ flex: 1, borderRadius: 5, height: w.h, background: w.bg }} />))}
@@ -89,6 +92,11 @@ export function Spending() {
           <span>W1</span><span>W2</span><span>W3</span><span>W4</span>
         </div>
       </div>
+      {vm.spendEmpty && (
+        <div style={{ padding: "40px 26px", textAlign: "center", color: "var(--muted-2)", fontSize: 14, lineHeight: 1.5 }}>
+          No spending recorded this month.<br />Tap <b style={{ color: "#C2693E" }}>+</b> to add your first expense.
+        </div>
+      )}
       {vm.spendCats.map((c) => (
         <div key={c.name} style={{ padding: "14px 26px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -291,7 +299,7 @@ export function Settings() {
             value={vm.usernameDraft}
             onChange={(e) => vm.setUsernameDraft(e.target.value)}
             onBlur={vm.checkUsername}
-            placeholder="pick a handle, e.g. maya"
+            placeholder="pick a handle, e.g. atlas"
             style={{ flex: 1, border: "1px solid var(--line-strong)", borderRadius: 13, padding: 13, font: "500 15px var(--font-sans)", color: "var(--ink)", background: "var(--surface)", outline: "none" }}
           />
           <div data-testid="settings-username-save" onClick={vm.saveUsername} style={{ background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", borderRadius: 13, padding: "13px 16px", font: "600 14px var(--font-sans)", cursor: "pointer", whiteSpace: "nowrap" }}>Save</div>
@@ -346,18 +354,8 @@ export function Settings() {
           onClick={() => { if (typeof window === "undefined" || window.confirm("Sign out of Tally?")) auth.signOut(); }}
           style={{ textAlign: "center", border: "1px solid var(--line-strong)", borderRadius: 16, padding: 15, font: "600 15px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}
         >
-          {auth.status === "demo" ? "Leave demo" : "Sign out"}
+          Sign out
         </div>
-        {auth.status === "demo" && (
-          <div style={{ fontSize: 12, color: "var(--muted-2)", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
-            You&apos;re exploring the demo. Sign in to keep your data.
-          </div>
-        )}
-        {auth.status === "in" && (
-          <div style={{ fontSize: 12, color: "var(--muted-2)", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
-            Sample data for now — your ledger will sync here once the API is wired up.
-          </div>
-        )}
       </div>
     </ScreenScroll>
   );

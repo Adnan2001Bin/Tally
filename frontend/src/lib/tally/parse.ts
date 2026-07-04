@@ -19,7 +19,9 @@ export interface ParsedFacts {
   lowConf: boolean;
 }
 
-const knownPeople = ["jim", "paul", "rina", "sara", "tom", "maya"];
+function rosterFromGroups(groups: Group[]): string[] {
+  return [...new Set(groups.flatMap((g) => g.members.map((m) => m.name.toLowerCase())))];
+}
 
 export function parse(textRaw: string, groups: Group[]): ParsedFacts {
   const text = (textRaw || "").trim();
@@ -37,7 +39,7 @@ export function parse(textRaw: string, groups: Group[]): ParsedFacts {
   const pm = t.match(/(\b[a-z]+\b)\s+paid/);
   if (pm) {
     const w = pm[1];
-    payer = w === "i" || w === "me" || w === "maya" ? "You" : cap(w);
+    payer = w === "i" || w === "me" ? "You" : cap(w);
   } else if (/\bi paid\b|\bi spent\b|\bmy\b/.test(t)) {
     payer = "You";
   }
@@ -47,12 +49,11 @@ export function parse(textRaw: string, groups: Group[]): ParsedFacts {
   groups.forEach((g) => {
     if (t.includes(g.name.toLowerCase())) group = g;
   });
-  if (t.includes("roommate")) group = groups.find((g) => g.id === "roommates") ?? group;
 
   // participants
   const parts: string[] = [];
   const unresolved: string[] = [];
-  const roster = group ? (group as Group).members.map((mm) => mm.name.toLowerCase()) : [];
+  const roster = group ? (group as Group).members.map((mm) => mm.name.toLowerCase()) : rosterFromGroups(groups);
   // Prefer the EXPLICIT split clause (split/among/between) over "with" so a phrase
   // like "dinner with roommates, I paid 960, split roommates" splits on "split …",
   // not on "with …" (which would greedily swallow "I paid" as a phantom person).
@@ -65,9 +66,8 @@ export function parse(textRaw: string, groups: Group[]): ParsedFacts {
       const w = tok.trim().toLowerCase().replace(/[^a-z]/g, "");
       if (!w) return;
       if (/paid|spent/.test(w)) return; // payer phrase ("I paid", "spent"), not a participant
-      if (w === "me" || w === "i" || w === "maya") parts.push("You");
+      if (w === "me" || w === "i") parts.push("You");
       else if (w.includes("roommate") && group) (group as Group).members.forEach((mm) => parts.push(mm.name));
-      else if (knownPeople.includes(w)) parts.push(cap(w));
       else if (roster.includes(w)) parts.push(cap(w));
       else if (w.length > 1) {
         parts.push(cap(w));

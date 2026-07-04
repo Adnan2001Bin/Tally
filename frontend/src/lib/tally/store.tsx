@@ -1,26 +1,27 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { computeOwed, mealCycleReconcile, personalShare, simplifyTransfers } from "@/lib/core";
 import type { ExpenseEvent } from "@/lib/core";
+import type { ExpenseHandlers } from "./expense-handlers";
 import { taka } from "./format";
 import { avatarColors, catColor, catIcon, catLabel, type Rel } from "./palette";
 import { Icon } from "./icons";
 import { parse } from "./parse";
-import { seedEntries, seedGroups, seedLoans, seedMealMembers, seedThings } from "./seed";
 import { groupExpenseNotifText, makeNotif, prefillText, resolveInvite } from "./social";
 import type { Draft, Entry, Group, GroupMember, Screen, TallyState } from "./types";
 
 const initialState: TallyState = {
   screen: "home",
-  activeGroup: "roommates",
+  activeGroup: "",
   capture: null,
   toast: null,
   paid: {},
   extraEntries: [],
+  apiPersonalEntries: [],
   returned: {},
   cleared: {},
-  mealMembers: seedMealMembers,
+  mealMembers: [],
   newGroupName: "",
-  newGroupMembers: ["Jim", "Sara"],
+  newGroupMembers: [],
   joinCode: "",
   createTab: "start",
   borrowAdd: null,
@@ -28,12 +29,12 @@ const initialState: TallyState = {
   offline: false,
   entry: null,
   lastScreen: "home",
-  groups: seedGroups,
-  loans: seedLoans,
-  things: seedThings,
+  groups: [],
+  loans: [],
+  things: [],
   notifications: [],
   disputed: {},
-  groupCodes: { roommates: "TALLY-RMMT", trip: "TALLY-TRIP" },
+  groupCodes: {},
   search: "",
   displayName: null,
   profile: null,
@@ -87,7 +88,11 @@ type Patch = Partial<TallyState> | ((s: TallyState) => Partial<TallyState>);
 
 // Module-level factory — keeps the Actions type independent of useTallyStore so
 // buildView(s, a: Actions) doesn't create a circular reference.
-function createActions(setState: React.Dispatch<React.SetStateAction<TallyState>>, stateRef: { current: TallyState }) {
+function createActions(
+  setState: React.Dispatch<React.SetStateAction<TallyState>>,
+  stateRef: { current: TallyState },
+    expenseHandlersRef?: React.MutableRefObject<ExpenseHandlers | null>,
+) {
   const getState = () => stateRef.current;
   const set = (patch: Patch) =>
     setState((prev) => ({ ...prev, ...(typeof patch === "function" ? patch(prev) : patch) }));
@@ -187,6 +192,8 @@ function createActions(setState: React.Dispatch<React.SetStateAction<TallyState>
     // ---- audit ----
     goAudit: () => set({ screen: "audit" }),
 
+    syncApiPersonalEntries: (entries: Entry[]) => set({ apiPersonalEntries: entries }),
+
     // capture
     openCapture: () => set({ capture: { stage: "input", mode: "say", text: "", amount: "", draft: null } }),
     closeCapture: () => set({ capture: null }),
@@ -242,28 +249,38 @@ function createActions(setState: React.Dispatch<React.SetStateAction<TallyState>
         set(toastPatch("Enter an amount"));
         return;
       }
-      set((s) => {
-        const entry: Entry = {
-          id: "n" + Date.now(),
-          when: "Today",
-          time: "just now",
-          title: "Expense",
-          sub: "Personal",
-          cat: "other",
-          amount: amt,
-          kind: "personal",
-          fresh: true,
-        };
-        return { capture: null, extraEntries: [entry, ...s.extraEntries], screen: "home", ...toastPatch("Added " + taka(amt)) };
-      });
+      const handlers = expenseHandlersRef?.current;
+      if (handlers?.isLive) {
+        void handlers
+          .createPersonal({ amount: amt, description: "Expense" })
+          .then(() => set({ capture: null, screen: "home", ...toastPatch("Added " + taka(amt)) }))
+          .catch((error) => set(toastPatch(handlers.getErrorMessage(error))));
+        return;
+      }
+      set(toastPatch("Sign in to save expenses"));
     },
     confirmDraft: () => {
+      const handlers = expenseHandlersRef?.current;
       set((s) => {
         const d = s.capture?.draft;
         if (!d) return {};
         const total = d.total;
         const sum = Object.values(d.owed).reduce((x, y) => x + y, 0);
         if (d.method === "exact" && sum !== total) return toastPatch("Split is off by " + taka(Math.abs(total - sum)));
+        if (!d.isShared && handlers?.isLive) {
+          void handlers
+            .createPersonal({ amount: total, description: d.title || "Expense" })
+            .then(() =>
+              setState((cur) => ({
+                ...cur,
+                capture: null,
+                screen: "home",
+                toast: "Added " + taka(total) + (cur.offline ? " · saved offline" : ""),
+              })),
+            )
+            .catch((error) => set(toastPatch(handlers.getErrorMessage(error))));
+          return {};
+        }
         // the bridge (FR-06 / GT-7): your private share derived by the core.
         const expenseEvent: ExpenseEvent = {
           kind: "expense", id: "tmp", total,
@@ -379,7 +396,7 @@ function createActions(setState: React.Dispatch<React.SetStateAction<TallyState>
         return { borrowAdd: null, things: [{ id: "t" + Date.now(), what: b.item.trim(), who: b.who.trim(), dir: b.dir, since: "just now" }, ...s.things], ...toastPatch("Item tracked") };
       }),
 
-    // meals — DEMO path (in-memory, by member name). Real path is keyed by memberId below.
+    // meals — in-memory until the meal API is wired
     logMeal: (name: string) => set((s) => ({ mealMembers: s.mealMembers.map((m) => (m.name === name ? { ...m, meals: m.meals + 1 } : m)) })),
     addGroceries: (name: string) => set((s) => ({ mealMembers: s.mealMembers.map((m) => (m.name === name ? { ...m, contributed: m.contributed + 200 } : m)) })),
     goMealClose: () => go("mealClose"),
@@ -401,7 +418,7 @@ function createActions(setState: React.Dispatch<React.SetStateAction<TallyState>
         return {
           groups: [...s.groups, { id, name, members }],
           groupCodes: { ...s.groupCodes, [id]: code },
-          activeGroup: id, inviteFor: { name, code }, screen: "invite", newGroupName: "", newGroupMembers: ["Jim", "Sara"],
+          activeGroup: id, inviteFor: { name, code }, screen: "invite", newGroupName: "", newGroupMembers: [],
           notifications: [makeNotif(`You created ${name}`, "group"), ...s.notifications],
         };
       });
@@ -430,7 +447,12 @@ function createActions(setState: React.Dispatch<React.SetStateAction<TallyState>
 
 export type Actions = ReturnType<typeof createActions>;
 
-export function useTallyStore(userName?: string) {
+export function useTallyStore(
+  userName?: string,
+  options?: {
+    expenseHandlersRef?: React.MutableRefObject<ExpenseHandlers | null>;
+  },
+) {
   const [state, setState] = useState<TallyState>(() => ({
     ...initialState,
     displayName: userName?.trim() || null,
@@ -445,7 +467,10 @@ export function useTallyStore(userName?: string) {
   // createActions never reads stateRef.current at creation — only inside its returned
   // closures (event handlers / async), so passing the ref here is safe (rule is conservative).
   // eslint-disable-next-line react-hooks/refs
-  const actions = useMemo(() => createActions(setState, stateRef), []);
+  const actions = useMemo(
+    () => createActions(setState, stateRef, options?.expenseHandlersRef),
+    [options?.expenseHandlersRef],
+  );
   // auto-dismiss the toast (idiomatic effect — no refs touched during render)
   useEffect(() => {
     if (state.toast == null) return;
@@ -458,7 +483,7 @@ export function useTallyStore(userName?: string) {
 // ---- view-model (renderVals equivalent) -----------------------------------
 
 function buildView(s: TallyState, a: Actions) {
-  const userName = s.displayName ?? "Maya";
+  const userName = s.displayName ?? "there";
   const accent = "#C2693E";
   const screen = s.screen;
   const cap0 = s.capture;
@@ -469,11 +494,11 @@ function buildView(s: TallyState, a: Actions) {
   for (const gr of s.groups) { const v = groupView(gr); ovOwed += v.owed; ovOwe += v.owe; }
   const gv = groupView(g);
 
-  // home stream
+  // home stream — API personal expenses plus any in-session shared entries
   const q = s.search.trim().toLowerCase();
-  const feedBase = seedEntries;
+  const feedBase = [...s.apiPersonalEntries, ...s.extraEntries];
   const buildStream = () => {
-    const all = [...s.extraEntries, ...feedBase].filter(
+    const all = feedBase.filter(
       (e) => !q || (e.title + " " + (e.sub || "")).toLowerCase().includes(q),
     );
     const order = ["Today", "Yesterday", "Earlier"];
@@ -521,7 +546,7 @@ function buildView(s: TallyState, a: Actions) {
     };
   });
 
-  const allE = [...s.extraEntries, ...feedBase];
+  const allE = feedBase;
   const groupActivity = allE.filter((e) => e.group === g.name).map((e) => {
     const c = catColor[e.cat] || "#8A847A";
     const amountText = e.kind === "owed" ? "+" + taka(e.amount) : taka(e.amount);
@@ -529,19 +554,36 @@ function buildView(s: TallyState, a: Actions) {
     return { title: e.title, sub: (e.sub || "").replace(g.name + " · ", ""), iconEl: <Icon name={catIcon(e.cat)} color={c} size={18} />, iconBg: c + "1f", amountText, amountColor, open: () => a.openEntry(e) };
   });
 
-  // spending — curated demo numbers for now (will derive from API data later)
-  const spendCats = [
-    { name: "Food & dining", amount: 3100, color: "#C2693E" },
-    { name: "Rent & bills", amount: 2400, color: "#8A847A" },
-    { name: "Groceries", amount: 1820, color: "#3F8E5B" },
-    { name: "Transport", amount: 1100, color: "#C9A24B" },
-  ];
-  const spendTotal = 8420;
-  const spendShared = 1240;
-  const spendEmpty = false;
-  const weeks = [{ p: 42 }, { p: 70 }, { p: 100 }, { p: 55 }].map((w, i) => ({
-    h: w.p + "%",
-    bg: i === 2 ? "#C2693E" : "#E2DCD0",
+  // spending — derived from API personal entries
+  const personal = s.apiPersonalEntries;
+  const spendTotal = personal.reduce((sum, e) => sum + e.amount, 0);
+  const spendShared = 0;
+  const spendEmpty = personal.length === 0;
+  const byCat: Record<string, number> = {};
+  for (const e of personal) {
+    byCat[e.cat] = (byCat[e.cat] ?? 0) + e.amount;
+  }
+  const spendCats = Object.entries(byCat)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, amount]) => ({
+      name: catLabel[cat] || "Other",
+      amount,
+      color: catColor[cat] || "#8A847A",
+    }));
+  const weekBuckets = [0, 0, 0, 0];
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  for (const e of personal) {
+    if (!e.at) continue;
+    const d = new Date(e.at);
+    if (d < monthStart) continue;
+    const weekIndex = Math.min(3, Math.floor((d.getDate() - 1) / 7));
+    weekBuckets[weekIndex] += e.amount;
+  }
+  const weekMax = Math.max(1, ...weekBuckets);
+  const peakWeek = weekBuckets.indexOf(Math.max(...weekBuckets));
+  const weeks = weekBuckets.map((amount, i) => ({
+    h: amount === 0 ? "4%" : Math.round((amount / weekMax) * 100) + "%",
+    bg: amount > 0 && i === peakWeek ? "#C2693E" : "#E2DCD0",
   }));
   const maxCat = Math.max(1, ...spendCats.map((c) => c.amount));
   const spendCatsView = spendCats.map((c) => ({ ...c, amountText: taka(c.amount), pct: Math.round((c.amount / maxCat) * 100) + "%" }));
@@ -570,7 +612,12 @@ function buildView(s: TallyState, a: Actions) {
       statusText = "Split evenly · " + taka(Math.round(dd.total / Math.max(1, dd.parts.length))) + " each";
       statusColor = "#8A847A";
     }
-    const pool = ["Jim", "Paul", "Rina", "Sara", "Tom"];
+    const knownMembers = [
+      ...new Set(
+        s.groups.flatMap((gr) => gr.members.map((m) => m.name)).filter((n) => n !== "You"),
+      ),
+    ];
+    const pool = knownMembers.length ? knownMembers : (dd.allMembers || []).filter((n) => n !== "You");
     const unresolved = (dd.unresolved || []).map((raw) => ({
       raw,
       options: [...pool.filter((x) => x !== raw), "Keep as “" + raw + "”"].map((o) => ({ name: o, assign: () => a.assignName(raw, o.startsWith("Keep") ? raw : o) })),
@@ -591,8 +638,8 @@ function buildView(s: TallyState, a: Actions) {
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map((k) => ({ label: k, color: k === "." || k === "⌫" ? "var(--muted)" : "var(--ink)", press: () => a.pressKey(k) }));
   const sayExamples = [
     { label: "coffee 120", txt: "coffee 120" },
-    { label: "groceries 1200, I paid, split roommates", txt: "groceries 1200, I paid, split roommates" },
-    { label: "cab with Sara, Tom 300", txt: "cab 300, split me, Sara, Tom" },
+    { label: "lunch 350", txt: "lunch 350" },
+    { label: "groceries 1200", txt: "groceries 1200" },
   ].map((e) => ({ label: e.label, use: () => a.useExample(e.txt) }));
 
   // ---- entry detail ----
@@ -697,7 +744,11 @@ function buildView(s: TallyState, a: Actions) {
   const logMealMe = () => a.logMeal("You");
   const addGrocMe = () => a.addGroceries("You");
 
-  const memberPool = ["Jim", "Paul", "Rina", "Sara", "Tom", "Ayan", "Nadia"];
+  const memberPool = [
+    ...new Set(
+      s.groups.flatMap((gr) => gr.members.map((m) => m.name)).filter((n) => n !== "You"),
+    ),
+  ];
   const createMembers = memberPool.map((n) => {
     const on = s.newGroupMembers.includes(n);
     return { name: n, on, toggle: () => a.toggleNewMember(n), bg: on ? "var(--chip-on-bg)" : "var(--surface-card)", color: on ? "var(--chip-on-fg)" : "var(--ink-soft)", border: on ? "var(--chip-on-bg)" : "var(--line-strong)" };
@@ -779,7 +830,7 @@ function buildView(s: TallyState, a: Actions) {
     owedText: taka(ovOwed), oweText: taka(ovOwe), streamSections: buildStream(),
 
     // spending
-    spendTotalText: spendTotal.toLocaleString("en-US"), spendSharedText: taka(spendShared),
+    spendTotalText: spendTotal.toLocaleString("en-US"), spendShared, spendSharedText: taka(spendShared),
     spendCats: spendCatsView, weeks, spendEmpty,
 
     // groups
@@ -877,11 +928,13 @@ const TallyContext = createContext<ReturnType<typeof useTallyStore> | null>(null
 export function TallyProvider({
   children,
   userName,
+  expenseHandlersRef,
 }: {
   children: React.ReactNode;
   userName?: string;
+  expenseHandlersRef?: React.MutableRefObject<ExpenseHandlers | null>;
 }) {
-  const store = useTallyStore(userName);
+  const store = useTallyStore(userName, { expenseHandlersRef });
   return <TallyContext.Provider value={store}>{children}</TallyContext.Provider>;
 }
 

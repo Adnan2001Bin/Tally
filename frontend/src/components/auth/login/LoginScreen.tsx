@@ -1,5 +1,3 @@
-import { AuthDivider } from "@/components/auth/ui/AuthDivider";
-import { DemoButton } from "@/components/auth/ui/DemoButton";
 import { LoginHeader } from "@/components/auth/login/LoginHeader";
 import { ModeToggle, type AuthMode } from "@/components/auth/login/ModeToggle";
 import { RegisterForm } from "@/components/auth/login/RegisterForm";
@@ -18,10 +16,6 @@ export function LoginScreen() {
     redirectToApp();
   };
 
-  const handleDemo = () => {
-    window.location.href = "/demo";
-  };
-
   return (
     <div
       data-testid="login-screen"
@@ -36,9 +30,6 @@ export function LoginScreen() {
         ) : (
           <SignInForm onSwitchToCreate={() => switchMode("create")} onSuccess={goApp} />
         )}
-
-        <AuthDivider />
-        <DemoButton onClick={handleDemo} />
       </div>
     </div>
   );

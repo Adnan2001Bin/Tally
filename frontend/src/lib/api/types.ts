@@ -15,6 +15,11 @@ export type {
   RevokeAllSessionsResponse,
   HealthResponse,
   RevokeAllSessionsParams,
+  Expense,
+  CreateExpenseBody,
+  UpdateExpenseBody,
+  ExpensesList,
+  ExpenseDetail,
 } from "./models";
 
 export type {
@@ -27,3 +32,8 @@ export type {
   RevokeAllSessionsResult,
   RevokeSessionResult,
 } from "./generated/auth/auth";
+
+export type {
+  CreateExpenseResult,
+  ListExpensesResult,
+} from "./generated/expenses/expenses";
