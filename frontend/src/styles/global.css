@@ -2,12 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, serif;
+
+  --surface: #faf8f3;
+  --surface-card: #ffffff;
+  --surface-sunken: #f4f1eb;
+  --surface-sand: #f0ece4;
+  --line: #ece7de;
+  --line-strong: #e7e3db;
+  --ink: #211e1a;
+  --ink-soft: #4a453e;
+  --muted: #8a847a;
+  --muted-2: #a39a8c;
+  --nav-bg: #ffffff;
+  --chip-on-bg: #211e1a;
+  --chip-on-fg: #faf8f3;
+}
+
+:root.dark,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1a1714;
+  --surface-card: #252019;
+  --surface-sunken: #2e2820;
+  --surface-sand: #2e2820;
+  --line: #352f27;
+  --line-strong: #3d362d;
+  --ink: #f3efe7;
+  --ink-soft: #cbc3b6;
+  --muted: #9a9183;
+  --muted-2: #877f72;
+  --nav-bg: #211d18;
+  --chip-on-bg: #f3efe7;
+  --chip-on-fg: #1a1714;
+}
+
+@keyframes tallyIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 @layer base {
   :root {
     color-scheme: light;
   }
 
   body {
-    @apply m-0 bg-[#0f0f0f] font-sans text-ink antialiased;
+    @apply m-0 font-sans antialiased;
+    background: #0f0f0f;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
   }
+
+  :root.dark body,
+  :root[data-theme="dark"] body {
+    background: #100e0c;
+  }
+}
+
+.tally-app-backdrop {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background: var(--surface-sand);
+}
+
+:root.dark .tally-app-backdrop,
+:root[data-theme="dark"] .tally-app-backdrop {
+  background: #100e0c;
 }

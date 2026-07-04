@@ -21,6 +21,22 @@ const { title = "Tally" } = Astro.props;
       rel="stylesheet"
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script is:inline>
+      (function () {
+        try {
+          var t = localStorage.getItem("tally-theme");
+          if (!t) {
+            t =
+              window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          }
+          var e = document.documentElement;
+          e.classList.toggle("dark", t === "dark");
+          e.setAttribute("data-theme", t);
+        } catch (_) {}
+      })();
+    </script>
     <title>{title}</title>
   </head>
   <body>

@@ -1,14 +1,17 @@
 ---
-import BaseLayout from "@/layouts/BaseLayout.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import DemoApp from "../../components/app/DemoApp";
 ---
 
-<BaseLayout>
-  <main class="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center px-6 text-center">
-    <div class="mb-4 flex h-[60px] w-[60px] items-center justify-center rounded-logo bg-ink">
-      <span class="font-serif text-[34px] text-canvas">৳</span>
+<BaseLayout title="Tally · Demo">
+  <DemoApp client:only="react">
+    <div
+      slot="fallback"
+      class="tally-app-backdrop"
+    >
+      <div class="mx-auto flex h-dvh w-full max-w-[420px] items-center justify-center bg-[var(--surface)] text-[var(--muted)]">
+        Loading demo…
+      </div>
     </div>
-    <h1 class="font-serif text-4xl">Demo mode</h1>
-    <p class="mt-2 max-w-sm text-muted">Explore Tally without an account. Full demo experience coming soon.</p>
-    <a href="/login" class="mt-8 text-sm font-semibold text-accent">Back to sign in</a>
-  </main>
+  </DemoApp>
 </BaseLayout>
