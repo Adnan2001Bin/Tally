@@ -25,19 +25,21 @@ export function LoginScreen() {
   return (
     <div
       data-testid="login-screen"
-      className="mx-auto flex min-h-dvh w-full max-w-[420px] flex-col justify-center bg-canvas px-[30px] pb-[calc(28px+env(safe-area-inset-bottom))] text-ink shadow-2xl"
+      className="mx-auto flex min-h-dvh w-full max-w-[420px] flex-col bg-canvas px-[30px] pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2.5rem,env(safe-area-inset-bottom))] text-ink shadow-2xl"
     >
-      <LoginHeader mode={mode} />
-      <ModeToggle mode={mode} onChange={switchMode} />
+      <div className="my-auto w-full">
+        <LoginHeader mode={mode} />
+        <ModeToggle mode={mode} onChange={switchMode} />
 
-      {mode === "create" ? (
-        <RegisterForm onSwitchToSignIn={() => switchMode("signin")} onSuccess={goApp} />
-      ) : (
-        <SignInForm onSwitchToCreate={() => switchMode("create")} onSuccess={goApp} />
-      )}
+        {mode === "create" ? (
+          <RegisterForm onSwitchToSignIn={() => switchMode("signin")} onSuccess={goApp} />
+        ) : (
+          <SignInForm onSwitchToCreate={() => switchMode("create")} onSuccess={goApp} />
+        )}
 
-      <AuthDivider />
-      <DemoButton onClick={handleDemo} />
+        <AuthDivider />
+        <DemoButton onClick={handleDemo} />
+      </div>
     </div>
   );
 }

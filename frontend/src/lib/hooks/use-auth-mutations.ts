@@ -7,9 +7,28 @@ import type { AxiosError } from "axios";
 
 const authApi = getAuth();
 
+const FALLBACK_ERROR = "Something went wrong. Please try again.";
+
+function isSafeUserMessage(message: string): boolean {
+  if (message.length > 160) return false;
+  // Block stack traces, Prisma dumps, and absolute paths from reaching the UI.
+  return !/prisma|invocation|E:\\|\/src\/|at\s+\S+\s+\(|node_modules/i.test(message);
+}
+
 function getErrorMessage(error: unknown): string {
   const axiosError = error as AxiosError<ApiError>;
-  return axiosError.response?.data?.message ?? "Something went wrong. Please try again.";
+  const message = axiosError.response?.data?.message?.trim();
+
+  if (message && isSafeUserMessage(message)) {
+    return message;
+  }
+
+  const status = axiosError.response?.status;
+  if (status === 401) return "Invalid email or password.";
+  if (status === 409) return "An account with these details already exists.";
+  if (status === 400) return "Please check your input and try again.";
+
+  return FALLBACK_ERROR;
 }
 
 export function useLoginMutation() {
