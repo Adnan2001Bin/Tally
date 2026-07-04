@@ -25,3 +25,4 @@ export function handleAuthError(error: unknown, reply: FastifyReply) {
 
   throw error;
 }
+

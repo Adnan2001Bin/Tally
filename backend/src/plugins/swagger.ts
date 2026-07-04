@@ -15,6 +15,13 @@ import {
   sessionPublicSchema,
   userPublicSchema,
 } from "../modules/auth/auth.schemas.js";
+import {
+  createExpenseBodySchema,
+  expenseIdParamsSchema,
+  expensePublicSchema,
+  schemaRef as expensesSchemaRef,
+  updateExpenseBodySchema,
+} from "../modules/expenses/expenses.schemas.js";
 
 const sessionsListSchema = {
   $id: schemaRef.sessionsList,
@@ -52,6 +59,25 @@ const healthResponseSchema = {
   },
 } as const;
 
+const expensesListOpenApiSchema = {
+  $id: expensesSchemaRef.expensesList,
+  type: "object",
+  properties: {
+    expenses: {
+      type: "array",
+      items: { $ref: `${expensesSchemaRef.expense}#` },
+    },
+  },
+} as const;
+
+const expenseDetailOpenApiSchema = {
+  $id: expensesSchemaRef.expenseDetail,
+  type: "object",
+  properties: {
+    expense: { $ref: `${expensesSchemaRef.expense}#` },
+  },
+} as const;
+
 function ref(id: string) {
   return { $ref: `${id}#` };
 }
@@ -71,6 +97,22 @@ export default fp(async (fastify) => {
   fastify.addSchema(sessionDetailSchema);
   fastify.addSchema(revokeAllSessionsResponseSchema);
   fastify.addSchema(healthResponseSchema);
+
+  fastify.addSchema({
+    $id: expensesSchemaRef.createExpenseBody,
+    ...createExpenseBodySchema,
+  });
+  fastify.addSchema({
+    $id: expensesSchemaRef.updateExpenseBody,
+    ...updateExpenseBodySchema,
+  });
+  fastify.addSchema({ $id: expensesSchemaRef.expense, ...expensePublicSchema });
+  fastify.addSchema({
+    $id: expensesSchemaRef.expenseIdParams,
+    ...expenseIdParamsSchema,
+  });
+  fastify.addSchema(expensesListOpenApiSchema);
+  fastify.addSchema(expenseDetailOpenApiSchema);
 
   await fastify.register(swagger, {
     refResolver: {
@@ -95,6 +137,10 @@ export default fp(async (fastify) => {
       tags: [
         { name: "Health", description: "Service health checks" },
         { name: "Auth", description: "Registration, login, tokens, and sessions" },
+        {
+          name: "Expenses",
+          description: "Private personal ledger — amount, purpose, currency (default BDT)",
+        },
       ],
       components: {
         securitySchemes: {
