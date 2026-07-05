@@ -61,6 +61,26 @@ export function useCreateGroupExpenseMutation() {
   });
 }
 
+export function useUpdateGroupExpenseMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      groupId,
+      expenseId,
+      body,
+    }: {
+      groupId: string;
+      expenseId: string;
+      body: CreateGroupExpenseBody;
+    }) => groupsApi.updateGroupExpense(groupId, expenseId, body),
+    onSuccess: (_data, { groupId }) => {
+      void queryClient.invalidateQueries({ queryKey: groupsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: groupDetailQueryKey(groupId) });
+      void queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    },
+  });
+}
+
 export function useCreateGroupSettlementMutation() {
   const queryClient = useQueryClient();
   return useMutation({

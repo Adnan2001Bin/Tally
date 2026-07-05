@@ -7,6 +7,7 @@ import type {
   GroupSummary,
 } from "@/lib/api/models/groups/group";
 import type { Entry } from "./types";
+import { computeOwed } from "@/lib/core";
 
 function formatWhen(iso: string): { when: string; time: string } {
   const date = new Date(iso);
@@ -121,6 +122,48 @@ export function apiGroupExpenseToEntry(
     group: groupName,
     parts,
     yourShare,
+    createdBy: expense.created_by,
+    groupId: expense.group_id,
+    splitMethod:
+      expense.split_method === "exact" ? "exact" : "equal",
+  };
+}
+
+/** Build a split draft from a group expense entry for editing. */
+export function entryToDraft(entry: Entry, group: Group): Draft | null {
+  if (!entry.total && !entry.parts?.length) return null;
+  const total = entry.total ?? entry.amount;
+  if (!total) return null;
+
+  const allMembers = group.members.length ? group.members.map((m) => m.name) : ["You"];
+  const parts = entry.parts?.length
+    ? entry.parts.map((p) => p.name)
+    : allMembers;
+  const payer =
+    entry.paidBy && allMembers.includes(entry.paidBy) ? entry.paidBy : "You";
+  const method: "equal" | "exact" =
+    entry.splitMethod === "exact" ? "exact" : "equal";
+
+  let owed: Record<string, number>;
+  if (method === "exact" && entry.parts?.length) {
+    owed = {};
+    for (const p of entry.parts) owed[p.name] = p.owed;
+  } else {
+    owed = computeOwed(total, { method: "equal", participants: parts });
+  }
+
+  return {
+    title: entry.title,
+    total,
+    payer,
+    parts,
+    allMembers,
+    method,
+    cat: entry.cat,
+    group: group.name,
+    isShared: true,
+    unresolved: [],
+    owed,
   };
 }
 

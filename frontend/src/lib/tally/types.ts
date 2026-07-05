@@ -66,6 +66,10 @@ export interface Entry {
   yourShare?: number;
   /** Links a personal-ledger mirror back to the group expense. */
   sourceGroupExpenseId?: string;
+  /** User id of whoever added this expense (group expenses). */
+  createdBy?: string;
+  groupId?: string;
+  splitMethod?: "equal" | "exact" | "percent" | "shares";
 }
 
 export interface Loan {
@@ -116,6 +120,8 @@ export interface Capture {
   groupId?: string;
   /** Screen to return to after saving a group expense. */
   returnScreen?: Screen;
+  /** When set, confirm saves changes to this group expense id. */
+  editingExpenseId?: string;
 }
 
 export type NotifKind = "expense" | "settle" | "dispute" | "group" | "join";

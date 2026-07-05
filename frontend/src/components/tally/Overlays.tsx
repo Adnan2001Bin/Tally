@@ -85,14 +85,23 @@ export function Capture() {
       )}
 
       {vm.captureDraft && vm.draft && (
-        <div style={{ ...sheet, maxHeight: "92%", overflowY: "auto" }}>
+        <div style={{ ...sheet, maxHeight: "92%", minHeight: vm.captureIsEditing ? "min(88vh, 680px)" : undefined, overflowY: "auto" }}>
           {grip}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 24px 6px" }}>
-            <span data-testid="draft-edit-words" onClick={actions.backToInput} style={{ font: "600 15px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>‹ Edit words</span>
-            <span style={{ font: "600 12px var(--font-sans)", color: "#3F8E5B" }}>✓ Understood</span>
+            {vm.captureIsEditing ? (
+              <span onClick={actions.closeCapture} style={{ font: "600 15px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>Cancel</span>
+            ) : (
+              <span data-testid="draft-edit-words" onClick={actions.backToInput} style={{ font: "600 15px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>‹ Edit words</span>
+            )}
+            <span style={{ font: "600 12px var(--font-sans)", color: "#3F8E5B" }}>
+              {vm.captureIsEditing ? "Editing group expense" : "✓ Understood"}
+            </span>
+            <span style={{ width: 46 }} />
           </div>
           <div style={{ padding: "8px 26px 0" }}>
-            <div style={{ font: "600 11px var(--font-sans)", letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted-2)", marginBottom: 8 }}>Here&apos;s the draft — fix anything</div>
+            <div style={{ font: "600 11px var(--font-sans)", letterSpacing: ".12em", textTransform: "uppercase", color: "var(--muted-2)", marginBottom: 8 }}>
+              {vm.captureIsEditing ? "Update the split — fix anything" : "Here's the draft — fix anything"}
+            </div>
             <div style={{ fontSize: 13, color: "var(--muted)" }}>{vm.draft.title} · {vm.draft.groupLabel}</div>
             <div style={{ ...serif, fontSize: 46, lineHeight: 1.02 }}>{vm.draft.totalText}</div>
 

@@ -8,6 +8,8 @@ export type Expense = {
   updated_at: string;
   /** Set when this row mirrors a group expense share. */
   source_group_expense_id?: string | null;
+  /** Who created the linked group expense, if applicable. */
+  source_group_created_by?: string | null;
 };
 
 export type CreateExpenseBody = {

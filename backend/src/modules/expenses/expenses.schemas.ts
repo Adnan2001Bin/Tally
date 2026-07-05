@@ -73,6 +73,7 @@ export const expensePublicSchema = {
     description: { type: "string" },
     currency: { type: "string" },
     source_group_expense_id: { type: "string", format: "uuid", nullable: true },
+    source_group_created_by: { type: "string", format: "uuid", nullable: true },
     created_at: { type: "string", format: "date-time" },
     updated_at: { type: "string", format: "date-time" },
   },

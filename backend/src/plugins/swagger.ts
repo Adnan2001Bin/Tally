@@ -36,6 +36,7 @@ import {
   groupSettlementPublicSchema,
   groupSummaryPublicSchema,
   groupIdParamsSchema,
+  groupExpenseParamsSchema,
   groupMemberParamsSchema,
   joinGroupBodySchema,
   joinRequestPublicSchema,
@@ -233,6 +234,10 @@ export default fp(async (fastify) => {
   fastify.addSchema({
     $id: groupsSchemaRef.groupIdParams,
     ...groupIdParamsSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupExpenseParams,
+    ...groupExpenseParamsSchema,
   });
   fastify.addSchema({
     $id: groupsSchemaRef.groupMemberParams,

@@ -7,6 +7,7 @@ import {
   useCreateGroupSettlementMutation,
   useGroupsQuery,
   useJoinGroupMutation,
+  useUpdateGroupExpenseMutation,
 } from "@/lib/hooks/use-groups";
 import { getGroups } from "@/lib/api/generated/groups/groups";
 import type { GroupDetail } from "@/lib/api/models/groups/group";
@@ -36,6 +37,7 @@ export function GroupsBridge({ handlersRef }: GroupsBridgeProps) {
   const createGroupMutation = useCreateGroupMutation();
   const joinGroupMutation = useJoinGroupMutation();
   const createExpenseMutation = useCreateGroupExpenseMutation();
+  const updateExpenseMutation = useUpdateGroupExpenseMutation();
   const createSettlementMutation = useCreateGroupSettlementMutation();
   const { actions } = useTally();
   const storedUser = getStoredUser();
@@ -82,6 +84,7 @@ export function GroupsBridge({ handlersRef }: GroupsBridgeProps) {
         const detail = await groupsApi.getGroup(groupId);
         actions.syncGroupDetail(detail, currentUser);
         await syncJoinRequestsForDetail(detail);
+        return detail;
       },
       respondJoinRequest: async (groupId, requestId, action) => {
         await groupsApi.respondJoinRequest(groupId, requestId, { action });
@@ -91,6 +94,11 @@ export function GroupsBridge({ handlersRef }: GroupsBridgeProps) {
       },
       createGroupExpense: async (groupId, body) => {
         await createExpenseMutation.mutateAsync({ groupId, body });
+        const detail = await groupsApi.getGroup(groupId);
+        actions.syncGroupDetail(detail, currentUser);
+      },
+      updateGroupExpense: async (groupId, expenseId, body) => {
+        await updateExpenseMutation.mutateAsync({ groupId, expenseId, body });
         const detail = await groupsApi.getGroup(groupId);
         actions.syncGroupDetail(detail, currentUser);
       },
@@ -117,6 +125,7 @@ export function GroupsBridge({ handlersRef }: GroupsBridgeProps) {
     handlersRef,
     joinGroupMutation,
     storedUser?.id,
+    updateExpenseMutation,
   ]);
 
   useEffect(() => {

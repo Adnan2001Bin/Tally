@@ -10,5 +10,6 @@ export { updateMember } from "./update-member.service.js";
 export { removeMember, leaveGroup } from "./remove-member.service.js";
 export { transferOwnership } from "./transfer-ownership.service.js";
 export { createGroupExpense } from "./create-group-expense.service.js";
+export { updateGroupExpense } from "./update-group-expense.service.js";
 export { createGroupSettlement } from "./create-settlement.service.js";
 export { getGroupBalances, getMemberBalance, getTotalExpenses } from "./balance.service.js";

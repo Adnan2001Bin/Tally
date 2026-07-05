@@ -56,6 +56,7 @@ export function apiExpenseToEntry(expense: Expense): Entry {
       yourShare: expense.amount,
       at: expense.created_at,
       sourceGroupExpenseId: expense.source_group_expense_id ?? undefined,
+      createdBy: expense.source_group_created_by ?? undefined,
       note: expense.currency !== "BDT" ? expense.currency : undefined,
     };
   }

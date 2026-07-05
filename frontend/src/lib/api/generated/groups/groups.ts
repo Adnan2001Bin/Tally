@@ -69,6 +69,18 @@ export const getGroups = () => {
       data: body,
     });
 
+  const updateGroupExpense = (
+    groupId: string,
+    expenseId: string,
+    body: CreateGroupExpenseBody,
+  ) =>
+    customInstance<GroupExpense>({
+      url: `/groups/${groupId}/expenses/${expenseId}`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: body,
+    });
+
   const createGroupSettlement = (groupId: string, body: CreateGroupSettlementBody) =>
     customInstance<GroupSettlement>({
       url: `/groups/${groupId}/settlements`,
@@ -85,6 +97,7 @@ export const getGroups = () => {
     listJoinRequests,
     respondJoinRequest,
     createGroupExpense,
+    updateGroupExpense,
     createGroupSettlement,
   };
 };

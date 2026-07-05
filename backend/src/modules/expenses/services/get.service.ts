@@ -11,6 +11,9 @@ export async function getExpense(
 ): Promise<PersonalExpensePublic> {
   const expense = await prisma.personalExpense.findFirst({
     where: { id: expenseId, user_id: userId },
+    include: {
+      source_group_expense: { select: { created_by: true } },
+    },
   });
 
   if (!expense) {

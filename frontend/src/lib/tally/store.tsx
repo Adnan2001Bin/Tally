@@ -7,6 +7,7 @@ import {
   apiGroupExpenseToEntry,
   detailToGroup,
   draftToCreateExpenseBody,
+  entryToDraft,
   inviteLinkForCode,
 } from "./group-mapper";
 import type { GroupDetail } from "@/lib/api/models/groups/group";
@@ -15,6 +16,7 @@ import { avatarColors, catColor, catIcon, catLabel, type Rel } from "./palette";
 import { Icon } from "./icons";
 import { parse } from "./parse";
 import { groupExpenseNotifText, makeNotif, prefillText, resolveInvite } from "./social";
+import { getStoredUser } from "@/lib/auth/auth-storage";
 import type { Draft, Entry, Group, GroupMember, Screen, TallyState } from "./types";
 
 const initialState: TallyState = {
@@ -136,6 +138,20 @@ function groupStandingForHome(g: Group) {
   return { owed: 0, owe: 0, standing: 0 };
 }
 
+function resolveEntryCreatedBy(entry: Entry, apiGroupEntries: Entry[]): string | undefined {
+  if (entry.createdBy) return entry.createdBy;
+  if (!entry.sourceGroupExpenseId) return undefined;
+  return apiGroupEntries.find((ge) => ge.id === entry.sourceGroupExpenseId)?.createdBy;
+}
+
+function entryCanEdit(entry: Entry, apiGroupEntries: Entry[], currentUserId?: string): boolean {
+  const groupLinked = !!entry.sourceGroupExpenseId || !!entry.total;
+  if (!groupLinked) return true;
+  if (!currentUserId) return false;
+  const createdBy = resolveEntryCreatedBy(entry, apiGroupEntries);
+  return !!createdBy && createdBy === currentUserId;
+}
+
 // ---- store hook -----------------------------------------------------------
 
 type Patch = Partial<TallyState> | ((s: TallyState) => Partial<TallyState>);
@@ -184,6 +200,78 @@ function createActions(
       return;
     }
     open();
+  };
+
+  const openGroupExpenseEditAction = (expenseId: string, fallback: Entry) => {
+    const cur = getState();
+    const returnScreen: Screen =
+      cur.screen === "entry" ? cur.lastScreen || "group" : cur.screen;
+    const group =
+      cur.groups.find((g) => g.id === fallback.groupId) ??
+      cur.groups.find((g) => g.name === fallback.group) ??
+      cur.groups.find((g) => g.id === cur.activeGroup);
+    if (!group) {
+      set(toastPatch("Open the group first"));
+      return;
+    }
+
+    const currentUser = (() => {
+      const u = getStoredUser();
+      return u ? { id: u.id, display_name: u.display_name } : null;
+    })();
+
+    const openDraft = (entryForDraft: Entry, groupForDraft: Group) => {
+      const draft = entryToDraft(entryForDraft, groupForDraft);
+      if (!draft) {
+        set(toastPatch("Couldn't load expense to edit"));
+        return;
+      }
+      set({
+        activeGroup: groupForDraft.id,
+        entry: null,
+        screen: returnScreen,
+        capture: {
+          stage: "draft",
+          mode: "say",
+          text: "",
+          amount: "",
+          draft,
+          groupId: groupForDraft.id,
+          editingExpenseId: expenseId,
+          returnScreen,
+        },
+      });
+    };
+
+    const entryFromDetail = (detail: GroupDetail): Entry | null => {
+      const expense = detail.expenses.find((e) => e.id === expenseId);
+      if (!expense) return null;
+      const g = detailToGroup(detail, currentUser);
+      return apiGroupExpenseToEntry(expense, g.name, g.members, currentUser);
+    };
+
+    const cached = cur.apiGroupEntries.find((ge) => ge.id === expenseId);
+    if (cached) {
+      openDraft(cached, group);
+      return;
+    }
+
+    const handlers = groupHandlersRef?.current;
+    if (handlers?.isLive) {
+      void handlers
+        .loadGroupDetail(group.id)
+        .then((detail) => {
+          const loaded = entryFromDetail(detail);
+          if (loaded) {
+            openDraft(loaded, detailToGroup(detail, currentUser));
+          } else {
+            set(toastPatch("Couldn't load expense to edit"));
+          }
+        })
+        .catch((error) => set(toastPatch(handlers.getErrorMessage(error))));
+      return;
+    }
+    openDraft(fallback, group);
   };
 
   return {
@@ -283,7 +371,14 @@ function createActions(
     // ---- audit ----
     goAudit: () => set({ screen: "audit" }),
 
-    syncApiPersonalEntries: (entries: Entry[]) => set({ apiPersonalEntries: entries }),
+    syncApiPersonalEntries: (entries: Entry[]) =>
+      set((s) => ({
+        apiPersonalEntries: entries.map((e) => {
+          if (e.groupId || !e.group) return e;
+          const g = s.groups.find((g) => g.name === e.group);
+          return g ? { ...e, groupId: g.id } : e;
+        }),
+      })),
 
     setAppLoading: (loading: boolean) => set({ appLoading: loading }),
     setAppRefreshing: (refreshing: boolean) => set({ appRefreshing: refreshing }),
@@ -305,7 +400,12 @@ function createActions(
         for (const g of groups) {
           if (g.inviteCode) groupCodes[g.id] = g.inviteCode;
         }
-        return { groups, groupCodes };
+        const apiPersonalEntries = s.apiPersonalEntries.map((e) => {
+          if (e.groupId || !e.group) return e;
+          const g = groups.find((g) => g.name === e.group);
+          return g ? { ...e, groupId: g.id } : e;
+        });
+        return { groups, groupCodes, apiPersonalEntries };
       }),
 
     syncJoinRequests: (
@@ -358,7 +458,16 @@ function createActions(
     openCapture: () =>
       set({ capture: { stage: "input", mode: "say", text: "", amount: "", draft: null } }),
     openGroupExpense: openGroupExpenseAction,
-    closeCapture: () => set({ capture: null }),
+    closeCapture: () =>
+      set((s) => {
+        if (!s.capture) return {};
+        const patch: Partial<TallyState> = { capture: null };
+        if (s.capture.editingExpenseId && s.screen === "entry") {
+          patch.entry = null;
+          patch.screen = s.capture.returnScreen ?? s.lastScreen ?? "home";
+        }
+        return patch;
+      }),
     modeSay: () => set((s) => (s.capture ? { capture: { ...s.capture, mode: "say" } } : {})),
     modeManual: () => set((s) => (s.capture ? { capture: { ...s.capture, mode: "manual" } } : {})),
     onCaptureInput: (v: string) => set((s) => (s.capture ? { capture: { ...s.capture, text: v } } : {})),
@@ -488,6 +597,22 @@ function createActions(
               return toastPatch("Couldn't match members — open the group and try again");
             }
             const returnScreen = s.capture?.returnScreen || "group";
+            const editingId = s.capture?.editingExpenseId;
+            if (editingId) {
+              void groupHandlers
+                .updateGroupExpense(group.id, editingId, body)
+                .then(() =>
+                  setState((cur) => ({
+                    ...cur,
+                    capture: null,
+                    screen: returnScreen,
+                    activeGroup: group.id,
+                    toast: `Updated ${d.title || "expense"}`,
+                  })),
+                )
+                .catch((error) => set(toastPatch(groupHandlers.getErrorMessage(error))));
+              return {};
+            }
             void groupHandlers
               .createGroupExpense(group.id, body)
               .then(() =>
@@ -644,9 +769,26 @@ function createActions(
       set((s) => ({ disputed: { ...s.disputed, [id]: true }, notifications: [makeNotif(`You flagged ${label} — the group was notified`, "dispute"), ...s.notifications], ...toastPatch("Flagged for the group") })),
     resolveDispute: (id: string, label: string) =>
       set((s) => ({ disputed: { ...s.disputed, [id]: false }, notifications: [makeNotif(`Dispute on ${label} resolved`, "dispute"), ...s.notifications], ...toastPatch("Marked resolved") })),
-    // QoL: search + edit (edit opens capture pre-filled → a NEW entry, never mutates)
+    // QoL: search + edit
     setSearch: (v: string) => set({ search: v }),
-    editEntry: (e: Entry) => set({ screen: "home", entry: null, capture: { stage: "input", mode: "say", text: prefillText(e.title, e.amount), amount: "", draft: null } }),
+    editEntry: (e: Entry) => {
+      const expenseId = e.sourceGroupExpenseId ?? (e.total ? e.id : null);
+      if (expenseId) {
+        openGroupExpenseEditAction(expenseId, e);
+        return;
+      }
+      set({
+        screen: "home",
+        entry: null,
+        capture: {
+          stage: "input",
+          mode: "say",
+          text: prefillText(e.title, e.amount),
+          amount: "",
+          draft: null,
+        },
+      });
+    },
 
     // settle / borrow / meals toggles
     markPaid: (
@@ -1069,9 +1211,11 @@ function buildView(s: TallyState, a: Actions) {
       exactBg: dd.method === "exact" ? "var(--surface-card)" : "transparent", exactColor: dd.method === "exact" ? "var(--ink)" : "var(--muted)",
       confirmBg: valid ? "var(--chip-on-bg)" : "#C9C2B6",
       confirmLabel: valid
-        ? s.capture?.groupId
-          ? "Add to group"
-          : "Confirm"
+        ? s.capture?.editingExpenseId
+          ? "Save changes"
+          : s.capture?.groupId
+            ? "Add to group"
+            : "Confirm"
         : "Balance the split first",
       editOwed: (name: string, v: string) => a.editDraftOwed(name, v),
     };
@@ -1097,7 +1241,7 @@ function buildView(s: TallyState, a: Actions) {
   // ---- entry detail ----
   const entry = s.entry;
   let entryView: {
-    id: string; disputed: boolean; raw: Entry;
+    id: string; disputed: boolean; raw: Entry; canEdit: boolean;
     shared: boolean; isPersonal: boolean; catLabel: string; catColor: string; catIcon: React.ReactNode;
     totalText: string; yourShareText: string; paidBy: string; group: string; when: string; note: string; title: string;
     rows: { name: string; initial: string; owedText: string; tag: string; color: string; you: boolean; rowBg: string }[];
@@ -1105,6 +1249,8 @@ function buildView(s: TallyState, a: Actions) {
   if (entry) {
     const c = catColor[entry.cat] || "#8A847A";
     const shared = !!entry.total;
+    const currentUserId = getStoredUser()?.id;
+    const canEdit = entryCanEdit(entry, s.apiGroupEntries, currentUserId);
     const rows = shared && entry.parts
       ? entry.parts.map((p) => {
           let tag: string, color = "#8A847A";
@@ -1116,7 +1262,7 @@ function buildView(s: TallyState, a: Actions) {
         })
       : [];
     entryView = {
-      id: entry.id, disputed: !!s.disputed[entry.id], raw: entry,
+      id: entry.id, disputed: !!s.disputed[entry.id], raw: entry, canEdit,
       shared, isPersonal: !shared, catLabel: catLabel[entry.cat] || "Other", catColor: c,
       catIcon: <Icon name={catIcon(entry.cat)} color={c} size={22} />,
       totalText: taka(shared ? entry.total! : entry.amount),
@@ -1259,6 +1405,7 @@ function buildView(s: TallyState, a: Actions) {
     captureText: cap0?.text || "", manualAmount: cap0?.amount || "0",
     captureGroupName: captureGroup?.name || "",
     captureIsGroupExpense: !!cap0?.groupId,
+    captureIsEditing: !!cap0?.editingExpenseId,
     openGroupExpense: a.openGroupExpense,
     sayBg: cap0?.mode === "say" ? "var(--surface-card)" : "transparent", sayColor: cap0?.mode === "say" ? "var(--ink)" : "var(--muted)",
     manualBg: cap0?.mode === "manual" ? "var(--surface-card)" : "transparent", manualColor: cap0?.mode === "manual" ? "var(--ink)" : "var(--muted)",

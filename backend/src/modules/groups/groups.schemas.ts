@@ -24,6 +24,7 @@ export const groupsOperationIds = {
   leaveGroup: "leaveGroup",
   transferOwnership: "transferOwnership",
   createGroupExpense: "createGroupExpense",
+  updateGroupExpense: "updateGroupExpense",
   createGroupSettlement: "createGroupSettlement",
 } as const;
 
@@ -45,6 +46,7 @@ export const schemaRef = {
   joinRequest: "JoinRequest",
   joinRequestsList: "JoinRequestsList",
   groupIdParams: "GroupIdParams",
+  groupExpenseParams: "GroupExpenseParams",
   groupMemberParams: "GroupMemberParams",
   joinRequestParams: "JoinRequestParams",
   apiError: "ApiError",
@@ -184,6 +186,15 @@ export const groupIdParamsSchema = {
   required: ["groupId"],
   properties: {
     groupId: { type: "string", format: "uuid" },
+  },
+} as const;
+
+export const groupExpenseParamsSchema = {
+  type: "object",
+  required: ["groupId", "expenseId"],
+  properties: {
+    groupId: { type: "string", format: "uuid" },
+    expenseId: { type: "string", format: "uuid" },
   },
 } as const;
 

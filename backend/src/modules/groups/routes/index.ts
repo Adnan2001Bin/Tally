@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createGroupRoute } from "./create.route.js";
 import { createGroupExpenseRoute } from "./create-expense.route.js";
+import { updateGroupExpenseRoute } from "./update-expense.route.js";
 import { createGroupSettlementRoute } from "./create-settlement.route.js";
 import { deleteGroupRoute } from "./delete.route.js";
 import { getGroupRoute } from "./get.route.js";
@@ -28,5 +29,6 @@ export async function groupsRoutes(app: FastifyInstance) {
   leaveGroupRoute(app);
   transferOwnershipRoute(app);
   createGroupExpenseRoute(app);
+  updateGroupExpenseRoute(app);
   createGroupSettlementRoute(app);
 }

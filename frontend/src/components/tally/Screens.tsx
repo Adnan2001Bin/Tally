@@ -877,7 +877,11 @@ export function EntryDetail() {
     <ScreenScroll pad="8px 0 40px" style={{ background: "var(--surface)" }}>
       <div style={{ padding: "14px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <BackLink label="‹ Back" onClick={vm.backFromEntry} testid="entry-back" />
-        <span data-testid="entry-edit" onClick={() => vm.editEntry(e.raw)} style={{ font: "600 14px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}>Edit</span>
+        {e.canEdit ? (
+          <span data-testid="entry-edit" onClick={() => vm.editEntry(e.raw)} style={{ font: "600 14px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}>Edit</span>
+        ) : (
+          <span style={{ width: 46 }} />
+        )}
       </div>
       <div style={{ padding: "18px 26px 22px", textAlign: "center", borderBottom: "1px solid var(--line)" }}>
         <div style={{ width: 62, height: 62, borderRadius: 18, margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center", background: e.catColor + "1f" }}>{e.catIcon}</div>
@@ -928,7 +932,9 @@ export function EntryDetail() {
               <div style={{ font: "600 13px var(--font-sans)", color: "#C2693E", marginBottom: 9 }}>You flagged this — the group has been notified.</div>
               <div style={{ display: "flex", gap: 9 }}>
                 <div data-testid="dispute-resolve" onClick={() => vm.resolveDispute(e.id, e.title)} style={{ flex: 1, textAlign: "center", background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", borderRadius: 12, padding: 11, font: "600 13px var(--font-sans)", cursor: "pointer" }}>Mark resolved</div>
-                <div onClick={() => vm.editEntry(e.raw)} style={{ flex: 1, textAlign: "center", background: "var(--surface-card)", border: "1px solid var(--line-strong)", color: "var(--ink-soft)", borderRadius: 12, padding: 11, font: "600 13px var(--font-sans)", cursor: "pointer" }}>Propose a fix</div>
+                {e.canEdit && (
+                  <div onClick={() => vm.editEntry(e.raw)} style={{ flex: 1, textAlign: "center", background: "var(--surface-card)", border: "1px solid var(--line-strong)", color: "var(--ink-soft)", borderRadius: 12, padding: 11, font: "600 13px var(--font-sans)", cursor: "pointer" }}>Propose a fix</div>
+                )}
               </div>
             </div>
           ) : (

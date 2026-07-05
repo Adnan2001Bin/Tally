@@ -3,6 +3,7 @@ import type { PersonalExpense as PrismaPersonalExpense } from "@prisma/client";
 /** Public personal expense — amount serialized as a number for JSON clients. */
 export type PersonalExpensePublic = Omit<PrismaPersonalExpense, "amount"> & {
   amount: number;
+  source_group_created_by?: string | null;
 };
 
 export type PersonalExpenseCreateInput = {
@@ -13,11 +14,15 @@ export type PersonalExpenseCreateInput = {
 
 export type PersonalExpenseUpdateInput = Partial<PersonalExpenseCreateInput>;
 
-export function toPublicPersonalExpense(
-  expense: PrismaPersonalExpense,
-): PersonalExpensePublic {
+type PersonalExpenseWithSource = PrismaPersonalExpense & {
+  source_group_expense?: { created_by: string } | null;
+};
+
+export function toPublicPersonalExpense(expense: PersonalExpenseWithSource): PersonalExpensePublic {
+  const { source_group_expense, ...rest } = expense;
   return {
-    ...expense,
+    ...rest,
     amount: Number(expense.amount.toFixed(2)),
+    source_group_created_by: source_group_expense?.created_by ?? null,
   };
 }
