@@ -1,0 +1,25 @@
+---
+type Props = {
+  message?: string;
+};
+
+const { message = "Loading…" } = Astro.props;
+---
+
+<div
+  class="flex min-h-dvh items-center justify-center bg-[#0f0f0f]"
+  role="status"
+  aria-live="polite"
+  aria-busy="true"
+>
+  <div class="flex flex-col items-center gap-5">
+    <div class="relative flex h-[60px] w-[60px] items-center justify-center rounded-logo bg-ink">
+      <span class="font-serif text-[34px] text-canvas">৳</span>
+      <span
+        class="auth-loader-ring absolute inset-0 rounded-logo border-2 border-canvas/20 border-t-canvas"
+        aria-hidden="true"
+      ></span>
+    </div>
+    <p class="text-sm font-medium text-white/70">{message}</p>
+  </div>
+</div>

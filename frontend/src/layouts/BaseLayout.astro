@@ -6,6 +6,8 @@ type Props = {
 };
 
 const { title = "Tally" } = Astro.props;
+const path = Astro.url.pathname;
+const isAuthEntry = path === "/" || path === "/login";
 ---
 
 <!doctype html>
@@ -37,6 +39,17 @@ const { title = "Tally" } = Astro.props;
         } catch (_) {}
       })();
     </script>
+    {isAuthEntry && (
+      <script is:inline>
+        (function () {
+          try {
+            if (localStorage.getItem("tally_access_token")) {
+              window.location.replace("/app");
+            }
+          } catch (_) {}
+        })();
+      </script>
+    )}
     <title>{title}</title>
   </head>
   <body>

@@ -1,5 +1,6 @@
 import { isAuthenticated } from "@/lib/auth/auth-storage";
 import { redirectToApp } from "@/lib/auth/auth-routes";
+import { AuthLoader } from "@/components/auth/AuthLoader";
 import { useEffect, useState, type ReactNode } from "react";
 
 type GuestGuardProps = {
@@ -18,11 +19,7 @@ export function GuestGuard({ children }: GuestGuardProps) {
   }, []);
 
   if (!allowed) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#0f0f0f] text-canvas">
-        <p className="text-sm text-white/70">Redirecting…</p>
-      </div>
-    );
+    return <AuthLoader message="Checking session…" />;
   }
 
   return <>{children}</>;
