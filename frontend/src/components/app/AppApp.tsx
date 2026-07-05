@@ -5,6 +5,7 @@ import { useLogoutMutation } from "@/lib/hooks/use-auth-actions";
 import { getStoredUser } from "@/lib/auth/auth-storage";
 import { TallyAuthProvider } from "@/lib/tally/auth-bridge";
 import { ExpensesBridge } from "@/lib/tally/expenses-bridge";
+import { ProfileBridge } from "@/lib/tally/profile-bridge";
 import type { ExpenseHandlers } from "@/lib/tally/expense-handlers";
 import { TallyProvider } from "@/lib/tally/store";
 import { ThemeProvider } from "@/lib/tally/theme";
@@ -22,6 +23,7 @@ function TallyAppInner() {
         expenseHandlersRef={expenseHandlersRef}
       >
         <ExpensesBridge handlersRef={expenseHandlersRef} />
+        <ProfileBridge />
         <ThemeProvider>
           <div className="tally-app-backdrop">
             <Shell />

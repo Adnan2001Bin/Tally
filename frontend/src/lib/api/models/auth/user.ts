@@ -16,6 +16,7 @@ export interface User {
   profile_image?: UserProfileImage;
   currency?: string;
   language?: string;
+  monthly_budget?: number | null;
   email_verified?: boolean;
   created_at?: string;
   updated_at?: string;

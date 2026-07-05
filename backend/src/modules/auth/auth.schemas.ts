@@ -102,6 +102,7 @@ export const userPublicSchema = {
     profile_image: { type: ["string", "null"] },
     currency: { type: "string" },
     language: { type: "string" },
+    monthly_budget: { type: ["number", "null"] },
     email_verified: { type: "boolean" },
     created_at: { type: "string", format: "date-time" },
     updated_at: { type: "string", format: "date-time" },

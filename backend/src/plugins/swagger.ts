@@ -22,6 +22,10 @@ import {
   schemaRef as expensesSchemaRef,
   updateExpenseBodySchema,
 } from "../modules/expenses/expenses.schemas.js";
+import {
+  schemaRef as usersSchemaRef,
+  updateProfileBodySchema,
+} from "../modules/users/users.schemas.js";
 
 const sessionsListSchema = {
   $id: schemaRef.sessionsList,
@@ -78,6 +82,14 @@ const expenseDetailOpenApiSchema = {
   },
 } as const;
 
+const userDetailOpenApiSchema = {
+  $id: usersSchemaRef.userDetail,
+  type: "object",
+  properties: {
+    user: { $ref: "User#" },
+  },
+} as const;
+
 function ref(id: string) {
   return { $ref: `${id}#` };
 }
@@ -114,6 +126,12 @@ export default fp(async (fastify) => {
   fastify.addSchema(expensesListOpenApiSchema);
   fastify.addSchema(expenseDetailOpenApiSchema);
 
+  fastify.addSchema({
+    $id: usersSchemaRef.updateProfileBody,
+    ...updateProfileBodySchema,
+  });
+  fastify.addSchema(userDetailOpenApiSchema);
+
   await fastify.register(swagger, {
     refResolver: {
       buildLocalReference(json, _baseUri, _fragment, i) {
@@ -141,6 +159,7 @@ export default fp(async (fastify) => {
           name: "Expenses",
           description: "Private personal ledger — amount, purpose, currency (default BDT)",
         },
+        { name: "Users", description: "Profile and preferences" },
       ],
       components: {
         securitySchemes: {

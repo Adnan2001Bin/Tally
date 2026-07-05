@@ -2,6 +2,7 @@ import React from "react";
 import { useTally } from "@/lib/tally/store";
 import { useAuth } from "@/lib/tally/auth-bridge";
 import { useTheme } from "@/lib/tally/theme";
+import { getProfileErrorMessage, useUpdateProfileMutation } from "@/lib/hooks/use-profile";
 import { Icon } from "@/lib/tally/icons";
 import { BackLink, ScreenScroll, SectionLabel, serif } from "./ui";
 
@@ -68,23 +69,128 @@ export function Home() {
 
 // ============ SPENDING ============
 export function Spending() {
-  const { vm } = useTally();
+  const { vm, actions } = useTally();
+  const updateProfile = useUpdateProfileMutation();
+
+  const saveMonthlyBudget = () => {
+    const amt = parseFloat(vm.monthlyBudgetDraft || "0") || 0;
+    if (!amt) {
+      actions.flash("Enter how much you have this month");
+      return;
+    }
+    updateProfile.mutate(
+      { monthly_budget: amt },
+      {
+        onSuccess: (data) => {
+          actions.syncMonthlyBudget(data.user.monthly_budget ?? amt);
+          actions.closeMonthlyBudgetEdit();
+          actions.flash("Monthly amount saved");
+        },
+        onError: (error) => actions.flash(getProfileErrorMessage(error)),
+      },
+    );
+  };
+
+  const clearMonthlyBudget = () => {
+    updateProfile.mutate(
+      { monthly_budget: null },
+      {
+        onSuccess: () => {
+          actions.clearMonthlyBudget();
+          actions.flash("Monthly amount cleared");
+        },
+        onError: (error) => actions.flash(getProfileErrorMessage(error)),
+      },
+    );
+  };
+
   return (
     <ScreenScroll>
       <div style={{ padding: "16px 26px 20px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ ...serif, fontSize: 30 }}>Your spending</span>
-          <span style={{ font: "600 13px var(--font-sans)", color: "var(--ink-soft)", background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: 999, padding: "6px 13px" }}>June ▾</span>
+          <span style={{ font: "600 13px var(--font-sans)", color: "var(--ink-soft)", background: "var(--surface-card)", border: "1px solid var(--line-strong)", borderRadius: 999, padding: "6px 13px" }}>{vm.monthLabel} ▾</span>
         </div>
         <div style={{ ...serif, fontSize: 62, lineHeight: 1.02, marginTop: 16 }}>
           <span style={{ fontSize: 30, color: "var(--muted)" }}>৳</span>{vm.spendTotalText}
         </div>
         <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>
-          this month
+          spent this month
           {vm.spendShared > 0 && (
             <> · <span style={{ color: "#C2693E" }}>incl. {vm.spendSharedText} from shared</span></>
           )}
         </div>
+
+        {/* Monthly budget */}
+        <div style={{ marginTop: 20, background: "var(--surface-card)", border: "1px solid var(--line)", borderRadius: 16, padding: "14px 16px" }}>
+          {vm.editingMonthlyBudget ? (
+            <>
+              <div style={{ font: "600 11px var(--font-sans)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted-2)", marginBottom: 8 }}>
+                How much do you have this month?
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ font: "600 16px var(--font-sans)", color: "var(--muted)" }}>৳</span>
+                <input
+                  data-testid="monthly-budget-input"
+                  value={vm.monthlyBudgetDraft}
+                  onChange={(e) => vm.setMonthlyBudgetDraft(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="e.g. 50000"
+                  style={{ flex: 1, border: "1px solid var(--line-strong)", borderRadius: 12, padding: "12px 14px", font: "600 18px var(--font-sans)", color: "var(--ink)", background: "var(--surface)", outline: "none" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <div
+                  data-testid="monthly-budget-save"
+                  onClick={saveMonthlyBudget}
+                  style={{ flex: 1, textAlign: "center", background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", borderRadius: 12, padding: 12, font: "600 14px var(--font-sans)", cursor: "pointer" }}
+                >
+                  Save
+                </div>
+                <div
+                  onClick={vm.closeMonthlyBudgetEdit}
+                  style={{ flex: 1, textAlign: "center", background: "var(--surface)", border: "1px solid var(--line-strong)", color: "var(--ink-soft)", borderRadius: 12, padding: 12, font: "600 14px var(--font-sans)", cursor: "pointer" }}
+                >
+                  Cancel
+                </div>
+              </div>
+            </>
+          ) : vm.hasMonthlyBudget ? (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ font: "600 13px var(--font-sans)", color: "var(--ink-soft)" }}>
+                  of {vm.monthlyBudgetText} this month
+                </div>
+                <span
+                  data-testid="monthly-budget-edit"
+                  onClick={vm.openMonthlyBudgetEdit}
+                  style={{ font: "600 13px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}
+                >
+                  Edit
+                </span>
+              </div>
+              <div style={{ height: 8, background: "var(--line)", borderRadius: 99, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: vm.budgetUsedPct, background: vm.budgetBarColor, borderRadius: 99 }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12.5, color: "var(--muted)" }}>
+                <span>{vm.budgetUsedPct} used</span>
+                <span style={{ color: vm.budgetOver ? "#C2693E" : "#3F8E5B" }}>
+                  {vm.budgetOver ? "Over budget" : `${vm.budgetRemainingText} left`}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div
+              data-testid="monthly-budget-set"
+              onClick={vm.openMonthlyBudgetEdit}
+              style={{ textAlign: "center", padding: "4px 0", cursor: "pointer" }}
+            >
+              <div style={{ font: "600 14px var(--font-sans)", color: "#C2693E" }}>+ Set your monthly amount</div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>How much money you have for this month</div>
+            </div>
+          )}
+        </div>
+
         <div style={{ display: "flex", alignItems: "flex-end", gap: 9, height: 56, marginTop: 24 }}>
           {vm.weeks.map((w, i) => (<div key={i} style={{ flex: 1, borderRadius: 5, height: w.h, background: w.bg }} />))}
         </div>

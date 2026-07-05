@@ -160,6 +160,11 @@ export interface TallyState {
   usernameStatus: "idle" | "checking" | "available" | "taken";
   notifPref: boolean; // placeholder notifications preference
 
+  // ---- monthly budget ----
+  monthlyBudget: number | null;
+  editingMonthlyBudget: boolean;
+  monthlyBudgetDraft: string;
+
   // ---- username invites (subject to acceptance) ----
   inviteUsername: string; // input on the Create screen
   groupInvites: Record<string, PendingInviteVM[]>; // groupId → invites this group has sent

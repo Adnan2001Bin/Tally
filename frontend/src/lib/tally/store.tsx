@@ -41,6 +41,9 @@ const initialState: TallyState = {
   usernameDraft: "",
   usernameStatus: "idle",
   notifPref: true,
+  monthlyBudget: null,
+  editingMonthlyBudget: false,
+  monthlyBudgetDraft: "",
   inviteUsername: "",
   groupInvites: {},
   myInvites: [],
@@ -193,6 +196,21 @@ function createActions(
     goAudit: () => set({ screen: "audit" }),
 
     syncApiPersonalEntries: (entries: Entry[]) => set({ apiPersonalEntries: entries }),
+
+    syncMonthlyBudget: (amount: number | null) =>
+      set({ monthlyBudget: amount, monthlyBudgetDraft: amount != null ? String(amount) : "" }),
+
+    openMonthlyBudgetEdit: () =>
+      set((s) => ({
+        editingMonthlyBudget: true,
+        monthlyBudgetDraft: s.monthlyBudget != null ? String(s.monthlyBudget) : "",
+      })),
+
+    closeMonthlyBudgetEdit: () => set({ editingMonthlyBudget: false }),
+
+    setMonthlyBudgetDraft: (v: string) => set({ monthlyBudgetDraft: v }),
+
+    clearMonthlyBudget: () => set({ monthlyBudget: null, monthlyBudgetDraft: "", editingMonthlyBudget: false }),
 
     // capture
     openCapture: () => set({ capture: { stage: "input", mode: "say", text: "", amount: "", draft: null } }),
@@ -554,8 +572,12 @@ function buildView(s: TallyState, a: Actions) {
     return { title: e.title, sub: (e.sub || "").replace(g.name + " · ", ""), iconEl: <Icon name={catIcon(e.cat)} color={c} size={18} />, iconBg: c + "1f", amountText, amountColor, open: () => a.openEntry(e) };
   });
 
-  // spending — derived from API personal entries
-  const personal = s.apiPersonalEntries;
+  // spending — derived from API personal entries (current month only)
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const personal = s.apiPersonalEntries.filter((e) => {
+    if (!e.at) return true;
+    return new Date(e.at) >= monthStart;
+  });
   const spendTotal = personal.reduce((sum, e) => sum + e.amount, 0);
   const spendShared = 0;
   const spendEmpty = personal.length === 0;
@@ -571,7 +593,6 @@ function buildView(s: TallyState, a: Actions) {
       color: catColor[cat] || "#8A847A",
     }));
   const weekBuckets = [0, 0, 0, 0];
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   for (const e of personal) {
     if (!e.at) continue;
     const d = new Date(e.at);
@@ -587,6 +608,15 @@ function buildView(s: TallyState, a: Actions) {
   }));
   const maxCat = Math.max(1, ...spendCats.map((c) => c.amount));
   const spendCatsView = spendCats.map((c) => ({ ...c, amountText: taka(c.amount), pct: Math.round((c.amount / maxCat) * 100) + "%" }));
+
+  const monthlyBudget = s.monthlyBudget;
+  const hasMonthlyBudget = monthlyBudget != null && monthlyBudget > 0;
+  const budgetRemaining = hasMonthlyBudget ? Math.max(0, monthlyBudget - spendTotal) : 0;
+  const budgetUsedPct = hasMonthlyBudget
+    ? Math.min(100, Math.round((spendTotal / monthlyBudget) * 100))
+    : 0;
+  const budgetOver = hasMonthlyBudget && spendTotal > monthlyBudget;
+  const monthLabel = new Date().toLocaleString("en-US", { month: "long" });
 
   // ---- capture draft ----
   const d = cap0?.draft || null;
@@ -832,6 +862,20 @@ function buildView(s: TallyState, a: Actions) {
     // spending
     spendTotalText: spendTotal.toLocaleString("en-US"), spendShared, spendSharedText: taka(spendShared),
     spendCats: spendCatsView, weeks, spendEmpty,
+    monthLabel,
+    hasMonthlyBudget,
+    monthlyBudgetText: hasMonthlyBudget ? taka(monthlyBudget) : "",
+    budgetRemainingText: taka(budgetRemaining),
+    budgetUsedPct: budgetUsedPct + "%",
+    budgetOver,
+    budgetBarColor: budgetOver ? "#C2693E" : "#3F8E5B",
+    editingMonthlyBudget: s.editingMonthlyBudget,
+    monthlyBudgetDraft: s.monthlyBudgetDraft,
+    openMonthlyBudgetEdit: a.openMonthlyBudgetEdit,
+    closeMonthlyBudgetEdit: a.closeMonthlyBudgetEdit,
+    setMonthlyBudgetDraft: a.setMonthlyBudgetDraft,
+    clearMonthlyBudget: a.clearMonthlyBudget,
+    syncMonthlyBudget: a.syncMonthlyBudget,
 
     // groups
     groupCards: s.groups.map((gr) => {

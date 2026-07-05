@@ -39,6 +39,10 @@ export function getStoredUser() {
   }
 }
 
+export function updateStoredUser(user: AuthSession["user"]): void {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
 export function isAuthenticated(): boolean {
   return Boolean(getAccessToken());
 }
