@@ -17,7 +17,8 @@ export type { SessionPublic };
 export type RegisterInput = {
   email: string;
   password: string;
-  username: string;
+  display_name: string;
+  username?: string;
   phone?: string;
   device_name?: string;
 };

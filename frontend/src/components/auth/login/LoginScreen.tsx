@@ -3,17 +3,30 @@ import { ModeToggle, type AuthMode } from "@/components/auth/login/ModeToggle";
 import { RegisterForm } from "@/components/auth/login/RegisterForm";
 import { SignInForm } from "@/components/auth/login/SignInForm";
 import { redirectToApp } from "@/lib/auth/auth-routes";
-import { useState } from "react";
+import {
+  getPendingGroupInvite,
+  normalizeInviteCode,
+  savePendingGroupInvite,
+} from "@/lib/auth/pending-invite";
+import { useEffect, useState } from "react";
 
 export function LoginScreen() {
   const [mode, setMode] = useState<AuthMode>("signin");
+
+  useEffect(() => {
+    const join = new URLSearchParams(window.location.search).get("join");
+    if (join) savePendingGroupInvite(normalizeInviteCode(join));
+  }, []);
 
   const switchMode = (next: AuthMode) => {
     setMode(next);
   };
 
   const goApp = () => {
-    redirectToApp();
+    const join =
+      new URLSearchParams(window.location.search).get("join") ??
+      getPendingGroupInvite();
+    redirectToApp(join ? normalizeInviteCode(join) : undefined);
   };
 
   return (

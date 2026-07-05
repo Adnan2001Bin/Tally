@@ -3,6 +3,7 @@ import { getAuth } from "@/lib/api/generated/auth/auth";
 import type { ApiError } from "@/lib/api/types";
 import { saveAuthSession } from "@/lib/auth/auth-storage";
 import { getDeviceName } from "@/lib/auth/device";
+import { validateLoginInput, validateRegisterInput } from "@/lib/auth/validate-auth";
 import type { AxiosError } from "axios";
 
 const authApi = getAuth();
@@ -16,6 +17,10 @@ function isSafeUserMessage(message: string): boolean {
 }
 
 function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && (error as Error & { isValidationError?: boolean }).isValidationError) {
+    return error.message;
+  }
+
   const axiosError = error as AxiosError<ApiError>;
   const message = axiosError.response?.data?.message?.trim();
 
@@ -34,8 +39,12 @@ function getErrorMessage(error: unknown): string {
 export function useLoginMutation() {
   return useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const validationError = validateLoginInput({ email, password });
+      if (validationError) {
+        throw Object.assign(new Error(validationError), { isValidationError: true });
+      }
       return authApi.login({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         device_name: getDeviceName(),
       });
@@ -49,16 +58,20 @@ export function useRegisterMutation() {
     mutationFn: async ({
       email,
       password,
-      username,
+      display_name,
     }: {
       email: string;
       password: string;
-      username: string;
+      display_name: string;
     }) => {
+      const validationError = validateRegisterInput({ email, password, display_name });
+      if (validationError) {
+        throw Object.assign(new Error(validationError), { isValidationError: true });
+      }
       return authApi.register({
-        email,
+        email: email.trim().toLowerCase(),
         password,
-        username,
+        display_name: display_name.trim(),
         device_name: getDeviceName(),
       });
     },

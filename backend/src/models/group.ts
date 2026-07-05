@@ -16,6 +16,7 @@ export type GroupMemberPublic = {
   id: string;
   user_id: string;
   username: string;
+  display_name: string;
   role: GroupMemberRole;
   balance: number;
   joined_at: string;
@@ -80,11 +81,12 @@ export type JoinRequestPublic = {
   group_id: string;
   user_id: string;
   username: string;
+  display_name: string;
   status: JoinRequestStatus;
   created_at: string;
 };
 
-type MemberWithUser = GroupMember & { user: Pick<User, "username"> };
+type MemberWithUser = GroupMember & { user: Pick<User, "username" | "display_name"> };
 
 export function toPublicGroupMember(
   member: MemberWithUser,
@@ -94,6 +96,7 @@ export function toPublicGroupMember(
     id: member.id,
     user_id: member.user_id,
     username: member.user.username,
+    display_name: member.user.display_name,
     role: member.role,
     balance,
     joined_at: member.joined_at.toISOString(),
@@ -160,13 +163,14 @@ export function toGroupSummary(
 }
 
 export function toPublicJoinRequest(
-  request: GroupJoinRequest & { user: Pick<User, "username"> },
+  request: GroupJoinRequest & { user: Pick<User, "username" | "display_name"> },
 ): JoinRequestPublic {
   return {
     id: request.id,
     group_id: request.group_id,
     user_id: request.user_id,
     username: request.user.username,
+    display_name: request.user.display_name,
     status: request.status,
     created_at: request.created_at.toISOString(),
   };

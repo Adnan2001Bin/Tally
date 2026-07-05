@@ -5,6 +5,7 @@ model User {
   phone          String?  @unique
   password_hash  String
   username       String   @unique
+  display_name   String   @db.VarChar(100)
   profile_image  String?
   currency       String   @default("USD") @db.VarChar(3)
   language       String   @default("en") @db.VarChar(10)

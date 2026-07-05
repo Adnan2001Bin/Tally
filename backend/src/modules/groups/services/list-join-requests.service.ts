@@ -12,7 +12,7 @@ export async function listJoinRequests(
 
   const requests = await prisma.groupJoinRequest.findMany({
     where: { group_id: groupId, status: "pending" },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
     orderBy: { created_at: "asc" },
   });
 

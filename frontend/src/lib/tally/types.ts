@@ -19,14 +19,23 @@ export type Screen =
   | "audit";
 
 export interface GroupMember {
+  id: string;
+  userId?: string;
   name: string;
   net: number; // positive = group owes them
+  role?: "owner" | "admin" | "member";
 }
 
 export interface Group {
   id: string;
   name: string;
   members: GroupMember[];
+  description?: string | null;
+  type?: string;
+  inviteCode?: string;
+  currency?: string;
+  memberCount?: number;
+  yourBalance?: number;
 }
 
 export type EntryKind = "personal" | "owed" | "share";
@@ -131,6 +140,8 @@ export interface TallyState {
   extraEntries: Entry[];
   /** Personal expenses loaded from the API. */
   apiPersonalEntries: Entry[];
+  /** Shared group expenses loaded from the API. */
+  apiGroupEntries: Entry[];
   returned: Record<string, boolean>;
   cleared: Record<string, boolean>;
   mealMembers: MealMember[];

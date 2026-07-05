@@ -34,11 +34,12 @@ export const schemaRef = {
 
 export const registerBodySchema = {
   type: "object",
-  required: ["email", "password", "username"],
+  required: ["email", "password", "display_name"],
   additionalProperties: false,
   properties: {
     email: { type: "string", format: "email", maxLength: 255 },
     password: { type: "string", minLength: 8, maxLength: 128 },
+    display_name: { type: "string", minLength: 2, maxLength: 100 },
     username: { type: "string", minLength: 3, maxLength: 30, pattern: usernamePattern },
     phone: { type: "string", minLength: 5, maxLength: 20 },
     device_name: { type: "string", maxLength: 255 },
@@ -99,6 +100,7 @@ export const userPublicSchema = {
     email: { type: "string" },
     phone: { type: ["string", "null"] },
     username: { type: "string" },
+    display_name: { type: "string" },
     profile_image: { type: ["string", "null"] },
     currency: { type: "string" },
     language: { type: "string" },

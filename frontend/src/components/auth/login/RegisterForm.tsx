@@ -11,7 +11,7 @@ type RegisterFormProps = {
 
 export function RegisterForm({ onSwitchToSignIn, onSuccess }: RegisterFormProps) {
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const registerMutation = useRegisterMutation();
@@ -20,7 +20,7 @@ export function RegisterForm({ onSwitchToSignIn, onSuccess }: RegisterFormProps)
   const handleSubmit = async () => {
     setNote(null);
     try {
-      await registerMutation.mutateAsync({ email, password, username });
+      await registerMutation.mutateAsync({ email, password, display_name: displayName });
       setNote("Account created — signing you in…");
       onSuccess();
     } catch {
@@ -39,18 +39,18 @@ export function RegisterForm({ onSwitchToSignIn, onSuccess }: RegisterFormProps)
         onChange={(e) => setEmail(e.target.value)}
       />
       <AuthField
-        testId="register-username"
+        testId="register-full-name"
         type="text"
-        autoComplete="username"
-        placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        autoComplete="name"
+        placeholder="Full name"
+        value={displayName}
+        onChange={(e) => setDisplayName(e.target.value)}
       />
       <AuthField
         testId="register-password"
         type="password"
         autoComplete="new-password"
-        placeholder="Choose a password"
+        placeholder="Password (8+ characters)"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />

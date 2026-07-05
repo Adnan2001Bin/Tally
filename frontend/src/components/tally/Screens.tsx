@@ -224,26 +224,101 @@ export function Spending() {
 // ============ GROUPS ============
 export function Groups() {
   const { vm } = useTally();
+  const empty = vm.groupCards.length === 0;
+
   return (
     <ScreenScroll>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 26px 14px" }}>
         <span style={{ ...serif, fontSize: 30 }}>Groups</span>
         <span data-testid="groups-new" onClick={vm.goCreate} style={{ font: "600 14px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}>+ New</span>
       </div>
-      {vm.groupCards.map((g) => (
-        <div key={g.id} data-testid={`group-card-${g.id}`} onClick={g.open} style={{ margin: "0 22px 14px", background: "var(--surface-card)", border: "1px solid var(--line)", borderRadius: 20, padding: 18, cursor: "pointer" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div style={{ ...serif, fontSize: 26, lineHeight: 1.05 }}>{g.name}</div>
-              <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 3 }}>{g.members}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ font: "600 11px var(--font-sans)", letterSpacing: ".06em", color: g.color }}>{g.label}</div>
-              <div style={{ ...serif, fontSize: 30, lineHeight: 1.1, color: g.color }}>{g.amountText}</div>
-            </div>
+      {empty ? (
+        <div
+          data-testid="groups-empty"
+          style={{
+            margin: "12px 22px 28px",
+            padding: "36px 28px 32px",
+            background: "var(--surface-card)",
+            border: "1px solid var(--line)",
+            borderRadius: 24,
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 22,
+              margin: "0 auto 22px",
+              background: "#F6EBE4",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="groups" color="#C2693E" size={34} />
+          </div>
+          <div style={{ ...serif, fontSize: 28, lineHeight: 1.1, color: "var(--ink)" }}>No groups yet</div>
+          <div
+            style={{
+              fontSize: 14.5,
+              color: "var(--muted)",
+              marginTop: 10,
+              lineHeight: 1.55,
+              maxWidth: 280,
+              marginLeft: "auto",
+              marginRight: "auto",
+            }}
+          >
+            Trips, roommates, office lunches — create a group to split expenses and see who owes what.
+          </div>
+          <div
+            data-testid="groups-empty-create"
+            onClick={vm.goCreate}
+            style={{
+              marginTop: 26,
+              background: "var(--chip-on-bg)",
+              color: "var(--chip-on-fg)",
+              borderRadius: 16,
+              padding: "16px 20px",
+              font: "600 16px var(--font-sans)",
+              cursor: "pointer",
+            }}
+          >
+            Create your first group
+          </div>
+          <div
+            data-testid="groups-empty-join"
+            onClick={() => {
+              vm.goCreate();
+              vm.setJoinTab();
+            }}
+            style={{
+              marginTop: 12,
+              font: "600 15px var(--font-sans)",
+              color: "#C2693E",
+              cursor: "pointer",
+            }}
+          >
+            Join with an invite code
           </div>
         </div>
-      ))}
+      ) : (
+        vm.groupCards.map((g) => (
+          <div key={g.id} data-testid={`group-card-${g.id}`} onClick={g.open} style={{ margin: "0 22px 14px", background: "var(--surface-card)", border: "1px solid var(--line)", borderRadius: 20, padding: 18, cursor: "pointer" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ ...serif, fontSize: 26, lineHeight: 1.05 }}>{g.name}</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 3 }}>{g.members}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ font: "600 11px var(--font-sans)", letterSpacing: ".06em", color: g.color }}>{g.label}</div>
+                <div style={{ ...serif, fontSize: 30, lineHeight: 1.1, color: g.color }}>{g.amountText}</div>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
     </ScreenScroll>
   );
 }
@@ -754,9 +829,9 @@ export function Create() {
       {vm.createIsJoin && (
         <div style={{ padding: "24px 26px 0" }}>
           <div style={{ font: "600 11px var(--font-sans)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted-2)", marginBottom: 10 }}>Enter the code a friend shared</div>
-          <input data-testid="join-code" value={vm.joinCode} onChange={(e) => actions.setJoinCode(e.target.value)} placeholder="TALLY-••••" style={{ width: "100%", border: "1px solid var(--line-strong)", borderRadius: 14, padding: 18, font: "600 22px var(--font-sans)", letterSpacing: ".1em", textAlign: "center", color: "var(--ink)", background: "var(--surface-card)", outline: "none" }} />
-          <div data-testid="join-submit" onClick={actions.joinGroup} style={{ marginTop: 22, background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>Join group</div>
-          <div style={{ marginTop: 14, textAlign: "center", fontSize: 12.5, color: "var(--muted-2)", lineHeight: 1.5 }}>A 6-character code, like TALLY-4QXR.<br />No code? Ask whoever started the group.</div>
+          <input data-testid="join-code" value={vm.joinCode} onChange={(e) => actions.setJoinCode(e.target.value)} placeholder="ABCD123" style={{ width: "100%", border: "1px solid var(--line-strong)", borderRadius: 14, padding: 18, font: "600 22px var(--font-sans)", letterSpacing: ".1em", textAlign: "center", color: "var(--ink)", background: "var(--surface-card)", outline: "none" }} />
+          <div data-testid="join-submit" onClick={actions.joinGroup} style={{ marginTop: 22, background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>Request to join</div>
+          <div style={{ marginTop: 14, textAlign: "center", fontSize: 12.5, color: "var(--muted-2)", lineHeight: 1.5 }}>Paste the code from the invite link.<br />The group admin will approve your request.</div>
         </div>
       )}
     </ScreenScroll>

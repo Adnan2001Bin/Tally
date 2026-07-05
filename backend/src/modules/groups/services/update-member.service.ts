@@ -19,7 +19,7 @@ export async function updateMember(
 
   const target = await prisma.groupMember.findFirst({
     where: { id: memberId, group_id: groupId },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
   });
   if (!target) {
     throw new GroupError("Member not found", 404, "MEMBER_NOT_FOUND");
@@ -34,7 +34,7 @@ export async function updateMember(
   const updated = await prisma.groupMember.update({
     where: { id: target.id },
     data: { role: input.role },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
   });
 
   const balance = await getMemberBalance(groupId, updated.id);

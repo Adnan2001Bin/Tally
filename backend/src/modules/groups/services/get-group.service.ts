@@ -25,7 +25,7 @@ export async function getGroup(
     await Promise.all([
       prisma.groupMember.findMany({
         where: { group_id: groupId },
-        include: { user: { select: { username: true } } },
+        include: { user: { select: { username: true, display_name: true } } },
         orderBy: [{ role: "desc" }, { joined_at: "asc" }],
       }),
       prisma.groupExpense.findMany({

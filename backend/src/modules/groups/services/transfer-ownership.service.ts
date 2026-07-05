@@ -15,7 +15,7 @@ export async function transferOwnership(
 
   const newOwner = await prisma.groupMember.findFirst({
     where: { id: input.new_owner_member_id, group_id: groupId },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
   });
   if (!newOwner) {
     throw new GroupError("Member not found", 404, "MEMBER_NOT_FOUND");
@@ -41,7 +41,7 @@ export async function transferOwnership(
 
   const members = await prisma.groupMember.findMany({
     where: { group_id: groupId },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
     orderBy: [{ role: "desc" }, { joined_at: "asc" }],
   });
 

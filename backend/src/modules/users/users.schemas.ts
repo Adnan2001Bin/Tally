@@ -32,6 +32,7 @@ export const userPublicSchema = {
     email: { type: "string" },
     phone: { type: ["string", "null"] },
     username: { type: "string" },
+    display_name: { type: "string" },
     profile_image: { type: ["string", "null"] },
     currency: { type: "string" },
     language: { type: "string" },

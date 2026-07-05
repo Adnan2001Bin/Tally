@@ -26,7 +26,7 @@ export async function joinGroup(
 
   const pending = await prisma.groupJoinRequest.findFirst({
     where: { group_id: group.id, user_id: userId, status: "pending" },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
   });
   if (pending) {
     return toPublicJoinRequest(pending);
@@ -38,7 +38,7 @@ export async function joinGroup(
       user_id: userId,
       status: "pending",
     },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
   });
 
   return toPublicJoinRequest(request);

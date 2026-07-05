@@ -1,0 +1,11 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import GroupInviteApp from "../../components/group/GroupInviteApp";
+import AuthLoader from "../../components/auth/AuthLoader.astro";
+---
+
+<BaseLayout title="Tally · Group invite">
+  <GroupInviteApp client:only="react">
+    <AuthLoader slot="fallback" message="Opening invite…" />
+  </GroupInviteApp>
+</BaseLayout>

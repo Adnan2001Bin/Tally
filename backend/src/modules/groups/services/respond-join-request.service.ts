@@ -15,7 +15,7 @@ export async function respondJoinRequest(
 
   const request = await prisma.groupJoinRequest.findFirst({
     where: { id: requestId, group_id: groupId, status: "pending" },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
   });
   if (!request) {
     throw new GroupError("Join request not found", 404, "REQUEST_NOT_FOUND");
@@ -25,7 +25,7 @@ export async function respondJoinRequest(
     const updated = await prisma.groupJoinRequest.update({
       where: { id: request.id },
       data: { status: "rejected" },
-      include: { user: { select: { username: true } } },
+      include: { user: { select: { username: true, display_name: true } } },
     });
     return toPublicJoinRequest(updated);
   }
@@ -37,7 +37,7 @@ export async function respondJoinRequest(
     const updated = await prisma.groupJoinRequest.update({
       where: { id: request.id },
       data: { status: "accepted" },
-      include: { user: { select: { username: true } } },
+      include: { user: { select: { username: true, display_name: true } } },
     });
     return toPublicJoinRequest(updated);
   }
@@ -53,7 +53,7 @@ export async function respondJoinRequest(
     return tx.groupJoinRequest.update({
       where: { id: request.id },
       data: { status: "accepted" },
-      include: { user: { select: { username: true } } },
+      include: { user: { select: { username: true, display_name: true } } },
     });
   });
 

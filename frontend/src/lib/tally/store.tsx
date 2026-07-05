@@ -2,6 +2,14 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { computeOwed, mealCycleReconcile, personalShare, simplifyTransfers } from "@/lib/core";
 import type { ExpenseEvent } from "@/lib/core";
 import type { ExpenseHandlers } from "./expense-handlers";
+import type { GroupHandlers } from "./group-handlers";
+import {
+  apiGroupExpenseToEntry,
+  detailToGroup,
+  draftToCreateExpenseBody,
+  inviteLinkForCode,
+} from "./group-mapper";
+import type { GroupDetail } from "@/lib/api/models/groups/group";
 import { taka } from "./format";
 import { avatarColors, catColor, catIcon, catLabel, type Rel } from "./palette";
 import { Icon } from "./icons";
@@ -17,6 +25,7 @@ const initialState: TallyState = {
   paid: {},
   extraEntries: [],
   apiPersonalEntries: [],
+  apiGroupEntries: [],
   returned: {},
   cleared: {},
   mealMembers: [],
@@ -94,7 +103,8 @@ type Patch = Partial<TallyState> | ((s: TallyState) => Partial<TallyState>);
 function createActions(
   setState: React.Dispatch<React.SetStateAction<TallyState>>,
   stateRef: { current: TallyState },
-    expenseHandlersRef?: React.MutableRefObject<ExpenseHandlers | null>,
+  expenseHandlersRef?: React.MutableRefObject<ExpenseHandlers | null>,
+  groupHandlersRef?: React.MutableRefObject<GroupHandlers | null>,
 ) {
   const getState = () => stateRef.current;
   const set = (patch: Patch) =>
@@ -109,6 +119,12 @@ function createActions(
     flash,
     openGroupById: (id: string) => {
       set({ activeGroup: id, screen: "group" });
+      const handlers = groupHandlersRef?.current;
+      if (handlers?.isLive) {
+        void handlers.loadGroupDetail(id).catch((error) => {
+          set(toastPatch(handlers.getErrorMessage(error)));
+        });
+      }
     },
     openEntry: (e: Entry) => set((s) => ({ entry: e, lastScreen: s.screen, screen: "entry" })),
     backFromEntry: () => set((s) => ({ screen: s.lastScreen || "home", entry: null })),
@@ -196,6 +212,30 @@ function createActions(
     goAudit: () => set({ screen: "audit" }),
 
     syncApiPersonalEntries: (entries: Entry[]) => set({ apiPersonalEntries: entries }),
+
+    syncApiGroups: (groups: Group[]) => set({ groups }),
+
+    syncGroupDetail: (
+      detail: GroupDetail,
+      currentUser: { id?: string; display_name?: string } | null,
+    ) =>
+      set((s) => {
+        const group = detailToGroup(detail, currentUser);
+        const groups = s.groups.some((g) => g.id === group.id)
+          ? s.groups.map((g) => (g.id === group.id ? group : g))
+          : [...s.groups, group];
+        const otherEntries = s.apiGroupEntries.filter((e) => e.group !== group.name);
+        const newEntries = detail.expenses.map((e) =>
+          apiGroupExpenseToEntry(e, group.name, group.members, currentUser),
+        );
+        return {
+          groups,
+          apiGroupEntries: [...otherEntries, ...newEntries],
+          groupCodes: group.inviteCode
+            ? { ...s.groupCodes, [group.id]: group.inviteCode }
+            : s.groupCodes,
+        };
+      }),
 
     syncMonthlyBudget: (amount: number | null) =>
       set({ monthlyBudget: amount, monthlyBudgetDraft: amount != null ? String(amount) : "" }),
@@ -299,6 +339,42 @@ function createActions(
             .catch((error) => set(toastPatch(handlers.getErrorMessage(error))));
           return {};
         }
+        if (d.isShared) {
+          const groupHandlers = groupHandlersRef?.current;
+          const group = d.group
+            ? getState().groups.find((g) => g.name === d.group)
+            : getState().groups.find((g) => g.id === getState().activeGroup);
+          if (groupHandlers?.isLive) {
+            if (!group) {
+              return toastPatch("Open the group first, then add the expense");
+            }
+            const body = draftToCreateExpenseBody(d, group);
+            if (!body) {
+              return toastPatch("Couldn't match members — open the group and try again");
+            }
+            void groupHandlers
+              .createGroupExpense(group.id, body)
+              .then(() =>
+                setState((cur) => ({
+                  ...cur,
+                  capture: null,
+                  screen: "home",
+                  toast: "Saved · your share posted to your personal ledger",
+                  notifications: d.group
+                    ? [
+                        makeNotif(
+                          groupExpenseNotifText(d.title || "Expense", taka(total), d.group),
+                          "expense",
+                        ),
+                        ...cur.notifications,
+                      ]
+                    : cur.notifications,
+                })),
+              )
+              .catch((error) => set(toastPatch(groupHandlers.getErrorMessage(error))));
+            return {};
+          }
+        }
         // the bridge (FR-06 / GT-7): your private share derived by the core.
         const expenseEvent: ExpenseEvent = {
           kind: "expense", id: "tmp", total,
@@ -388,11 +464,44 @@ function createActions(
     editEntry: (e: Entry) => set({ screen: "home", entry: null, capture: { stage: "input", mode: "say", text: prefillText(e.title, e.amount), amount: "", draft: null } }),
 
     // settle / borrow / meals toggles
-    markPaid: (key: string, label?: string) =>
+    markPaid: (
+      key: string,
+      label?: string,
+      settle?: { groupId: string; fromMemberId: string; toMemberId: string; amount: number },
+    ) => {
+      const groupHandlers = groupHandlersRef?.current;
+      if (settle && groupHandlers?.isLive) {
+        void groupHandlers
+          .createSettlement({
+            groupId: settle.groupId,
+            from_member_id: settle.fromMemberId,
+            to_member_id: settle.toMemberId,
+            amount: settle.amount,
+          })
+          .then(() =>
+            setState((s) => ({
+              ...s,
+              paid: { ...s.paid, [key]: true },
+              notifications: [
+                makeNotif(label ? `Recorded: ${label}` : "Payment recorded", "settle"),
+                ...s.notifications,
+              ],
+              toast: "Settlement recorded",
+            })),
+          )
+          .catch((error) => set(toastPatch(groupHandlers.getErrorMessage(error))));
+        return;
+      }
       set((s) => {
         const now = !s.paid[key];
-        return { paid: { ...s.paid, [key]: now }, notifications: now ? [makeNotif(label ? `Recorded: ${label}` : "Payment recorded", "settle"), ...s.notifications] : s.notifications };
-      }),
+        return {
+          paid: { ...s.paid, [key]: now },
+          notifications: now
+            ? [makeNotif(label ? `Recorded: ${label}` : "Payment recorded", "settle"), ...s.notifications]
+            : s.notifications,
+        };
+      });
+    },
     toggleReturned: (id: string) => set((s) => ({ returned: { ...s.returned, [id]: !s.returned[id] } })),
     toggleCleared: (id: string) => set((s) => ({ cleared: { ...s.cleared, [id]: !s.cleared[id] } })),
     openBorrowAdd: () => set({ borrowAdd: { type: "money", dir: "lent", who: "", amount: "", item: "", due: "" } }),
@@ -429,36 +538,93 @@ function createActions(
     createGroup: () => {
       const cur = getState();
       const name = (cur.newGroupName || "").trim() || "New group";
+      const groupHandlers = groupHandlersRef?.current;
+      if (groupHandlers?.isLive) {
+        void groupHandlers
+          .createGroup({ name })
+          .then((created) =>
+            set({
+              activeGroup: created.id,
+              inviteFor: { name: created.name, code: created.invite_code },
+              screen: "invite",
+              newGroupName: "",
+              newGroupMembers: [],
+              notifications: [
+                makeNotif(`You created ${created.name}`, "group"),
+                ...getState().notifications,
+              ],
+            }),
+          )
+          .catch((error) => set(toastPatch(groupHandlers.getErrorMessage(error))));
+        return;
+      }
       set((s) => {
         const id = "g" + Date.now();
-        const members: GroupMember[] = [{ name: "You", net: 0 }, ...s.newGroupMembers.map((n) => ({ name: n, net: 0 }))];
+        const members: GroupMember[] = [
+          { id: "local-you", name: "You", net: 0 },
+          ...s.newGroupMembers.map((n) => ({ id: `local-${n}`, name: n, net: 0 })),
+        ];
         const code = "TALLY-" + Math.random().toString(36).slice(2, 6).toUpperCase();
         return {
           groups: [...s.groups, { id, name, members }],
           groupCodes: { ...s.groupCodes, [id]: code },
-          activeGroup: id, inviteFor: { name, code }, screen: "invite", newGroupName: "", newGroupMembers: [],
+          activeGroup: id,
+          inviteFor: { name, code },
+          screen: "invite",
+          newGroupName: "",
+          newGroupMembers: [],
           notifications: [makeNotif(`You created ${name}`, "group"), ...s.notifications],
         };
       });
     },
     copyInvite: () =>
       set((s) => {
-        const link = "tally.app/j/" + (s.inviteFor?.code || "").toLowerCase().replace("tally-", "");
-        if (typeof navigator !== "undefined" && navigator.clipboard) navigator.clipboard.writeText(link).catch(() => {});
+        const code = s.inviteFor?.code || "";
+        const link = inviteLinkForCode(code);
+        if (typeof navigator !== "undefined" && navigator.clipboard) {
+          navigator.clipboard.writeText(link).catch(() => {});
+        }
         return toastPatch("Invite link copied");
       }),
-    joinGroup: () =>
+    joinGroup: () => {
+      const code = (getState().joinCode || "").trim();
+      if (code.length < 4) {
+        set(toastPatch("Enter the full code"));
+        return;
+      }
+      const groupHandlers = groupHandlersRef?.current;
+      if (groupHandlers?.isLive) {
+        void groupHandlers
+          .joinGroup({ invite_code: code })
+          .then(() =>
+            set({
+              joinCode: "",
+              screen: "groups",
+              toast: "Join request sent — the admin will approve it",
+            }),
+          )
+          .catch((error) => set(toastPatch(groupHandlers.getErrorMessage(error))));
+        return;
+      }
       set((s) => {
-        const code = (s.joinCode || "").trim();
-        if (code.length < 4) return toastPatch("Enter the full code");
         const gid = resolveInvite(code, s.groupCodes);
         if (!gid) return { joinCode: "", ...toastPatch("No group with that code") };
         const g = s.groups.find((x) => x.id === gid)!;
         const groups = s.groups.map((x) =>
-          x.id === gid && !x.members.some((m) => m.name === "You") ? { ...x, members: [{ name: "You", net: 0 }, ...x.members] } : x,
+          x.id === gid && !x.members.some((m) => m.name === "You")
+            ? { ...x, members: [{ id: "local-you", name: "You", net: 0 }, ...x.members] }
+            : x,
         );
-        return { groups, activeGroup: gid, screen: "group", joinCode: "", notifications: [makeNotif(`You joined ${g.name}`, "join"), ...s.notifications], ...toastPatch("Joined " + g.name) };
-      }),
+        return {
+          groups,
+          activeGroup: gid,
+          screen: "group",
+          joinCode: "",
+          notifications: [makeNotif(`You joined ${g.name}`, "join"), ...s.notifications],
+          ...toastPatch("Joined " + g.name),
+        };
+      });
+    },
     addToGroup: (gName: string) => { set({ screen: "home" }); set({ capture: { stage: "input", mode: "say", text: "", amount: "", draft: null } }); flash("Adding to " + gName); },
   };
 }
@@ -469,6 +635,7 @@ export function useTallyStore(
   userName?: string,
   options?: {
     expenseHandlersRef?: React.MutableRefObject<ExpenseHandlers | null>;
+    groupHandlersRef?: React.MutableRefObject<GroupHandlers | null>;
   },
 ) {
   const [state, setState] = useState<TallyState>(() => ({
@@ -486,8 +653,8 @@ export function useTallyStore(
   // closures (event handlers / async), so passing the ref here is safe (rule is conservative).
   // eslint-disable-next-line react-hooks/refs
   const actions = useMemo(
-    () => createActions(setState, stateRef, options?.expenseHandlersRef),
-    [options?.expenseHandlersRef],
+    () => createActions(setState, stateRef, options?.expenseHandlersRef, options?.groupHandlersRef),
+    [options?.expenseHandlersRef, options?.groupHandlersRef],
   );
   // auto-dismiss the toast (idiomatic effect — no refs touched during render)
   useEffect(() => {
@@ -514,7 +681,7 @@ function buildView(s: TallyState, a: Actions) {
 
   // home stream — API personal expenses plus any in-session shared entries
   const q = s.search.trim().toLowerCase();
-  const feedBase = [...s.apiPersonalEntries, ...s.extraEntries];
+  const feedBase = [...s.apiPersonalEntries, ...s.apiGroupEntries, ...s.extraEntries];
   const buildStream = () => {
     const all = feedBase.filter(
       (e) => !q || (e.title + " " + (e.sub || "")).toLowerCase().includes(q),
@@ -551,16 +718,36 @@ function buildView(s: TallyState, a: Actions) {
     const youGet = t.to === "You";
     const youPay = t.from === "You";
     const ac = avatarColors(youGet ? "owed" : "owe");
+    const fromMember = g.members.find((m) => m.name === t.from);
+    const toMember = g.members.find((m) => m.name === t.to);
+    const line =
+      (t.from === "You" ? "You pay " : t.from + " pays ") + (t.to === "You" ? "you" : t.to);
     return {
-      // grammatical second person: "You pay Jim" / "Jim pays you" (FR-11 everyday language)
-      line: (t.from === "You" ? "You pay " : t.from + " pays ") + (t.to === "You" ? "you" : t.to),
-      amountText: taka(t.amount), color: youGet ? "#3F8E5B" : "#C2693E", initial: t.from[0], avBg: ac.bg, avColor: ac.fg,
-      mark: () => a.markPaid(key, (t.from === "You" ? "You pay " : t.from + " pays ") + (t.to === "You" ? "you" : t.to)),
+      line,
+      amountText: taka(t.amount),
+      color: youGet ? "#3F8E5B" : "#C2693E",
+      initial: t.from[0],
+      avBg: ac.bg,
+      avColor: ac.fg,
+      mark: () => {
+        if (!fromMember?.id || !toMember?.id) {
+          a.flash("Open the group again to record this payment");
+          return;
+        }
+        a.markPaid(key, line, {
+          groupId: g.id,
+          fromMemberId: fromMember.id,
+          toMemberId: toMember.id,
+          amount: t.amount,
+        });
+      },
       btnText: isPaid ? "✓ Recorded" : youGet ? "Mark received" : "Mark as paid",
       btnBg: isPaid ? "#EAF1EC" : youPay ? "var(--chip-on-bg)" : "var(--surface-card)",
       btnColor: isPaid ? "#3F8E5B" : youPay ? "var(--chip-on-fg)" : "var(--ink-soft)",
       btnBorder: isPaid ? "#CDE3D3" : youPay ? "var(--chip-on-bg)" : "var(--line-strong)",
-      anim: "tallyIn .4s ease", showPay: youPay && !isPaid, pay: () => a.flash("Opening your payment app…"),
+      anim: "tallyIn .4s ease",
+      showPay: youPay && !isPaid,
+      pay: () => a.flash("Opening your payment app…"),
     };
   });
 
@@ -880,16 +1067,26 @@ function buildView(s: TallyState, a: Actions) {
     // groups
     groupCards: s.groups.map((gr) => {
       const v = groupView(gr);
-      const st = v.standing;
+      const st = gr.members.length > 1 ? v.standing : (gr.yourBalance ?? v.standing);
+      const membersLabel =
+        gr.memberCount && gr.members.length <= 1
+          ? `${gr.memberCount} member${gr.memberCount === 1 ? "" : "s"}`
+          : gr.members.map((m) => m.name).join(", ");
       return {
-        id: gr.id, name: gr.name, members: gr.members.map((m) => m.name).join(", "),
+        id: gr.id,
+        name: gr.name,
+        members: membersLabel,
         color: st > 0 ? "#3F8E5B" : st < 0 ? "#C2693E" : "#8A847A",
         label: st > 0 ? "YOU’RE OWED" : st < 0 ? "YOU OWE" : "SETTLED",
         amountText: st === 0 ? "—" : taka(Math.abs(st)),
         open: () => a.openGroupById(gr.id),
       };
     }),
-    groupName: g.name, groupMembers: g.members.map((m) => m.name).join(", "),
+    groupName: g.name,
+    groupMembers:
+      g.memberCount && g.members.length <= 1
+        ? `${g.memberCount} members`
+        : g.members.map((m) => m.name).join(", "),
     groupStandingLabel: gv.standing > 0 ? "Overall, you’re owed" : gv.standing < 0 ? "Overall, you owe" : "You’re all settled",
     groupStandingText: gv.standing === 0 ? "৳0" : taka(Math.abs(gv.standing)),
     groupStandingColor: gv.standing > 0 ? "#3F8E5B" : gv.standing < 0 ? "#C2693E" : "#8A847A",
@@ -924,8 +1121,9 @@ function buildView(s: TallyState, a: Actions) {
     baDirLentLabel: ba?.type === "item" ? "I lent it out" : "I lent", baDirBorrowedLabel: ba?.type === "item" ? "I borrowed it" : "I borrowed",
 
     // invite
-    inviteName: s.inviteFor?.name || "", inviteCode: s.inviteFor?.code || "",
-    inviteLink: "tally.app/j/" + (s.inviteFor?.code || "").toLowerCase().replace("tally-", ""),
+    inviteName: s.inviteFor?.name || "",
+    inviteCode: s.inviteFor?.code || "",
+    inviteLink: inviteLinkForCode(s.inviteFor?.code || ""),
 
     // offline
     offline: s.offline,
@@ -973,12 +1171,14 @@ export function TallyProvider({
   children,
   userName,
   expenseHandlersRef,
+  groupHandlersRef,
 }: {
   children: React.ReactNode;
   userName?: string;
   expenseHandlersRef?: React.MutableRefObject<ExpenseHandlers | null>;
+  groupHandlersRef?: React.MutableRefObject<GroupHandlers | null>;
 }) {
-  const store = useTallyStore(userName, { expenseHandlersRef });
+  const store = useTallyStore(userName, { expenseHandlersRef, groupHandlersRef });
   return <TallyContext.Provider value={store}>{children}</TallyContext.Provider>;
 }
 

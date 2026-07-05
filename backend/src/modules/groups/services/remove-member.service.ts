@@ -26,7 +26,7 @@ export async function removeMember(
 
   const target = await prisma.groupMember.findFirst({
     where: { id: memberId, group_id: groupId },
-    include: { user: { select: { username: true } } },
+    include: { user: { select: { username: true, display_name: true } } },
   });
   if (!target) {
     throw new GroupError("Member not found", 404, "MEMBER_NOT_FOUND");
@@ -37,7 +37,7 @@ export async function removeMember(
   const balance = await getMemberBalance(groupId, target.id);
   if (balance !== 0) {
     throw new GroupError(
-      formatBalanceMessage(balance, target.user.username),
+      formatBalanceMessage(balance, target.user.display_name),
       409,
       "OUTSTANDING_BALANCE",
     );

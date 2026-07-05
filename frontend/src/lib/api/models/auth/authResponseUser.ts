@@ -13,6 +13,7 @@ export type AuthResponseUser = {
   email?: string;
   phone?: AuthResponseUserPhone;
   username?: string;
+  display_name?: string;
   profile_image?: AuthResponseUserProfileImage;
   currency?: string;
   language?: string;
