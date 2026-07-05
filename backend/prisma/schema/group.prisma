@@ -1,0 +1,132 @@
+enum GroupType {
+  friends
+  family
+  office
+  trip
+  roommates
+  custom
+}
+
+enum GroupMemberRole {
+  owner
+  admin
+  member
+}
+
+enum JoinRequestStatus {
+  pending
+  accepted
+  rejected
+}
+
+/// Shared expense group — friends trip, roommates, office, etc.
+model Group {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(200)
+  description String?   @db.VarChar(1000)
+  type        GroupType @default(custom)
+  invite_code String    @unique @db.VarChar(12)
+  currency    String    @default("BDT") @db.VarChar(3)
+  created_by  String    @db.Uuid
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+
+  creator       User               @relation("GroupCreator", fields: [created_by], references: [id], onDelete: Cascade)
+  members       GroupMember[]
+  join_requests GroupJoinRequest[]
+  expenses      GroupExpense[]
+  settlements   GroupSettlement[]
+
+  @@index([created_by])
+  @@map("groups")
+}
+
+/// Stable membership row — `id` is the member_id used by balance math.
+model GroupMember {
+  id        String          @id @default(uuid()) @db.Uuid
+  group_id  String          @db.Uuid
+  user_id   String          @db.Uuid
+  role      GroupMemberRole @default(member)
+  joined_at DateTime        @default(now()) @db.Timestamptz
+
+  group Group @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  expenses_paid    GroupExpense[]      @relation("ExpensePayer")
+  expense_splits   GroupExpenseSplit[]
+  settlements_from GroupSettlement[]   @relation("SettlementFrom")
+  settlements_to   GroupSettlement[]   @relation("SettlementTo")
+
+  @@unique([group_id, user_id])
+  @@index([user_id])
+  @@map("group_members")
+}
+
+/// Pending invite-link join — admin accepts or rejects.
+model GroupJoinRequest {
+  id         String            @id @default(uuid()) @db.Uuid
+  group_id   String            @db.Uuid
+  user_id    String            @db.Uuid
+  status     JoinRequestStatus @default(pending)
+  created_at DateTime          @default(now()) @db.Timestamptz
+  updated_at DateTime          @updatedAt @db.Timestamptz
+
+  group Group @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([group_id, status])
+  @@map("group_join_requests")
+}
+
+model GroupExpense {
+  id                String   @id @default(uuid()) @db.Uuid
+  group_id          String   @db.Uuid
+  description       String   @db.VarChar(500)
+  category          String?  @db.VarChar(100)
+  total             Decimal  @db.Decimal(12, 2)
+  currency          String   @default("BDT") @db.VarChar(3)
+  paid_by_member_id String   @db.Uuid
+  split_method      String   @db.VarChar(20)
+  created_by        String   @db.Uuid
+  created_at        DateTime @default(now()) @db.Timestamptz
+  updated_at        DateTime @updatedAt @db.Timestamptz
+
+  group           Group               @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  paid_by         GroupMember         @relation("ExpensePayer", fields: [paid_by_member_id], references: [id])
+  splits          GroupExpenseSplit[]
+  personal_bridge PersonalExpense[]
+
+  @@index([group_id, created_at(sort: Desc)])
+  @@map("group_expenses")
+}
+
+model GroupExpenseSplit {
+  id         String  @id @default(uuid()) @db.Uuid
+  expense_id String  @db.Uuid
+  member_id  String  @db.Uuid
+  amount     Decimal @db.Decimal(12, 2)
+
+  expense GroupExpense @relation(fields: [expense_id], references: [id], onDelete: Cascade)
+  member  GroupMember  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@unique([expense_id, member_id])
+  @@map("group_expense_splits")
+}
+
+model GroupSettlement {
+  id             String   @id @default(uuid()) @db.Uuid
+  group_id       String   @db.Uuid
+  from_member_id String   @db.Uuid
+  to_member_id   String   @db.Uuid
+  amount         Decimal  @db.Decimal(12, 2)
+  currency       String   @default("BDT") @db.VarChar(3)
+  created_by     String   @db.Uuid
+  created_at     DateTime @default(now()) @db.Timestamptz
+
+  group Group       @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  from  GroupMember @relation("SettlementFrom", fields: [from_member_id], references: [id])
+  to    GroupMember @relation("SettlementTo", fields: [to_member_id], references: [id])
+
+  @@index([group_id, created_at(sort: Desc)])
+  @@map("group_settlements")
+}

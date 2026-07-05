@@ -26,6 +26,26 @@ import {
   schemaRef as usersSchemaRef,
   updateProfileBodySchema,
 } from "../modules/users/users.schemas.js";
+import {
+  createGroupBodySchema,
+  createGroupExpenseBodySchema,
+  createGroupSettlementBodySchema,
+  groupDetailPublicSchema,
+  groupExpensePublicSchema,
+  groupMemberPublicSchema,
+  groupSettlementPublicSchema,
+  groupSummaryPublicSchema,
+  groupIdParamsSchema,
+  groupMemberParamsSchema,
+  joinGroupBodySchema,
+  joinRequestPublicSchema,
+  joinRequestParamsSchema,
+  respondJoinRequestBodySchema,
+  schemaRef as groupsSchemaRef,
+  transferOwnershipBodySchema,
+  updateGroupBodySchema,
+  updateMemberBodySchema,
+} from "../modules/groups/groups.schemas.js";
 
 const sessionsListSchema = {
   $id: schemaRef.sessionsList,
@@ -90,6 +110,28 @@ const userDetailOpenApiSchema = {
   },
 } as const;
 
+const groupsListOpenApiSchema = {
+  $id: groupsSchemaRef.groupsList,
+  type: "object",
+  properties: {
+    groups: {
+      type: "array",
+      items: { $ref: `${groupsSchemaRef.groupSummary}#` },
+    },
+  },
+} as const;
+
+const joinRequestsListOpenApiSchema = {
+  $id: groupsSchemaRef.joinRequestsList,
+  type: "object",
+  properties: {
+    requests: {
+      type: "array",
+      items: { $ref: `${groupsSchemaRef.joinRequest}#` },
+    },
+  },
+} as const;
+
 function ref(id: string) {
   return { $ref: `${id}#` };
 }
@@ -132,6 +174,77 @@ export default fp(async (fastify) => {
   });
   fastify.addSchema(userDetailOpenApiSchema);
 
+  fastify.addSchema({
+    $id: groupsSchemaRef.createGroupBody,
+    ...createGroupBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.updateGroupBody,
+    ...updateGroupBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.joinGroupBody,
+    ...joinGroupBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.respondJoinRequestBody,
+    ...respondJoinRequestBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.updateMemberBody,
+    ...updateMemberBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.transferOwnershipBody,
+    ...transferOwnershipBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.createGroupExpenseBody,
+    ...createGroupExpenseBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.createGroupSettlementBody,
+    ...createGroupSettlementBodySchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupSummary,
+    ...groupSummaryPublicSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupDetail,
+    ...groupDetailPublicSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupMember,
+    ...groupMemberPublicSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupExpense,
+    ...groupExpensePublicSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupSettlement,
+    ...groupSettlementPublicSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.joinRequest,
+    ...joinRequestPublicSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupIdParams,
+    ...groupIdParamsSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.groupMemberParams,
+    ...groupMemberParamsSchema,
+  });
+  fastify.addSchema({
+    $id: groupsSchemaRef.joinRequestParams,
+    ...joinRequestParamsSchema,
+  });
+  fastify.addSchema(groupsListOpenApiSchema);
+  fastify.addSchema(joinRequestsListOpenApiSchema);
+
   await fastify.register(swagger, {
     refResolver: {
       buildLocalReference(json, _baseUri, _fragment, i) {
@@ -160,6 +273,11 @@ export default fp(async (fastify) => {
           description: "Private personal ledger — amount, purpose, currency (default BDT)",
         },
         { name: "Users", description: "Profile and preferences" },
+        {
+          name: "Groups",
+          description:
+            "Shared expense groups — members, invite links, balances, expenses, settlements",
+        },
       ],
       components: {
         securitySchemes: {
