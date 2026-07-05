@@ -127,6 +127,16 @@
   }
 }
 
+@keyframes tallyRefreshPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .auth-loader-ring {
   animation: authLoaderSpin 0.85s linear infinite;
 }

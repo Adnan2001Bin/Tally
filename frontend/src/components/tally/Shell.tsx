@@ -24,6 +24,7 @@ function OfflineBanner() {
 function BottomNav() {
   const { vm, actions } = useTally();
   if (!vm.showNav) return null;
+  const onFabClick = () => (vm.isGroup ? actions.openGroupExpense() : actions.openCapture());
   const item = (icon: React.ReactNode, label: string, color: string, onClick: () => void, testid: string) => (
     <div data-testid={testid} onClick={onClick} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, font: "600 10px var(--font-sans)", cursor: "pointer", color }}>{icon}{label}</div>
   );
@@ -31,10 +32,63 @@ function BottomNav() {
     <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-around", padding: "11px 14px calc(24px + env(safe-area-inset-bottom))", borderTop: "1px solid var(--line)", background: "var(--nav-bg)", zIndex: 2 }}>
       {item(vm.homeIcon, "Home", vm.navHome, vm.goHome, "nav-home")}
       {item(vm.spendIcon, "Spending", vm.navSpend, vm.goSpending, "nav-spending")}
-      <div data-testid="fab-capture" onClick={actions.openCapture} style={{ width: 54, height: 54, borderRadius: "50%", background: vm.accent, display: "flex", alignItems: "center", justifyContent: "center", marginTop: -28, boxShadow: "0 10px 24px -7px rgba(194,105,62,.6)", cursor: "pointer" }}>{vm.plusIcon}</div>
+      <div data-testid="fab-capture" onClick={onFabClick} style={{ width: 54, height: 54, borderRadius: "50%", background: vm.accent, display: "flex", alignItems: "center", justifyContent: "center", marginTop: -28, boxShadow: "0 10px 24px -7px rgba(194,105,62,.6)", cursor: "pointer" }}>{vm.plusIcon}</div>
       {item(vm.groupsIcon, "Groups", vm.navGroups, vm.goGroups, "nav-groups")}
       {item(vm.moreIcon, "More", vm.navHub, vm.goHub, "nav-more")}
     </div>
+  );
+}
+
+function AppLoader() {
+  const { vm } = useTally();
+  if (!vm.appLoading) return null;
+  return (
+    <div
+      data-testid="app-loader"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 30,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 14,
+        background: "var(--surface)",
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: "50%",
+          border: "3px solid var(--line)",
+          borderTopColor: "#C2693E",
+          animation: "authLoaderSpin .75s linear infinite",
+        }}
+      />
+      <div style={{ font: "600 14px var(--font-sans)", color: "var(--muted)" }}>Loading your tally…</div>
+    </div>
+  );
+}
+
+function RefreshBar() {
+  const { vm } = useTally();
+  if (!vm.appRefreshing || vm.appLoading) return null;
+  return (
+    <div
+      data-testid="app-refreshing"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        zIndex: 25,
+        background: "linear-gradient(90deg, transparent, #C2693E, transparent)",
+        animation: "tallyRefreshPulse 1.1s ease-in-out infinite",
+      }}
+    />
   );
 }
 
@@ -81,7 +135,11 @@ export function Shell() {
     >
       <SafeAreaTop />
       <OfflineBanner />
-      <Body />
+      <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <RefreshBar />
+        <Body />
+        <AppLoader />
+      </div>
       <BottomNav />
       <Capture />
       <BorrowAdd />

@@ -47,6 +47,8 @@ const initialState: TallyState = {
   joinRequests: [],
   search: "",
   displayName: null,
+  appLoading: true,
+  appRefreshing: false,
   profile: null,
   usernameDraft: "",
   usernameStatus: "idle",
@@ -65,6 +67,33 @@ const initialState: TallyState = {
 /** §6.2 equal split via the deterministic core (never reimplemented here). */
 function equalOwed(total: number, parts: string[]): Record<string, number> {
   return computeOwed(total, { method: "equal", participants: parts });
+}
+
+function draftForGroup(
+  group: Group,
+  total: number,
+  opts?: { title?: string; cat?: string; payer?: string; parts?: string[] },
+): Draft {
+  const members = group.members.length ? group.members.map((m) => m.name) : ["You"];
+  const roster = new Set(members);
+  const parts = opts?.parts?.filter((p) => roster.has(p)).length
+    ? opts.parts.filter((p) => roster.has(p))
+    : members;
+  const payer = opts?.payer && roster.has(opts.payer) ? opts.payer : "You";
+  const finalParts = [...new Set(parts.includes(payer) ? parts : [payer, ...parts])];
+  return {
+    title: opts?.title || "Expense",
+    total,
+    payer,
+    parts: finalParts,
+    allMembers: members,
+    method: "equal",
+    cat: opts?.cat || "other",
+    group: group.name,
+    isShared: true,
+    unresolved: [],
+    owed: equalOwed(total, finalParts),
+  };
 }
 
 interface GroupViewRow {
@@ -95,6 +124,18 @@ function groupView(g: Group) {
   return { tx, rows, owed, owe, standing: owed - owe };
 }
 
+/** Home / list standing — uses API your_balance when full member list isn't loaded yet. */
+function groupStandingForHome(g: Group) {
+  if (g.members.length > 1) {
+    const v = groupView(g);
+    return { owed: v.owed, owe: v.owe, standing: v.standing };
+  }
+  const bal = g.yourBalance ?? 0;
+  if (bal > 0) return { owed: bal, owe: 0, standing: bal };
+  if (bal < 0) return { owed: 0, owe: Math.abs(bal), standing: bal };
+  return { owed: 0, owe: 0, standing: 0 };
+}
+
 // ---- store hook -----------------------------------------------------------
 
 type Patch = Partial<TallyState> | ((s: TallyState) => Partial<TallyState>);
@@ -114,6 +155,36 @@ function createActions(
   const flash = (msg: string) => set({ toast: msg });
   // returned inside a functional updater to fold a toast into the patch.
   const toastPatch = (msg: string): Partial<TallyState> => ({ toast: msg });
+
+  const openGroupExpenseAction = (groupId?: string) => {
+    const gid = groupId || getState().activeGroup;
+    const group = getState().groups.find((g) => g.id === gid);
+    if (!gid || !group) {
+      set(toastPatch("Open a group first"));
+      return;
+    }
+    const open = () =>
+      set({
+        activeGroup: gid,
+        capture: {
+          stage: "input",
+          mode: "say",
+          text: "",
+          amount: "",
+          draft: null,
+          groupId: gid,
+          returnScreen: "group",
+        },
+      });
+    const handlers = groupHandlersRef?.current;
+    if (handlers?.isLive) {
+      void handlers.loadGroupDetail(gid).then(open).catch((error) => {
+        set(toastPatch(handlers.getErrorMessage(error)));
+      });
+      return;
+    }
+    open();
+  };
 
   return {
     go,
@@ -214,6 +285,9 @@ function createActions(
 
     syncApiPersonalEntries: (entries: Entry[]) => set({ apiPersonalEntries: entries }),
 
+    setAppLoading: (loading: boolean) => set({ appLoading: loading }),
+    setAppRefreshing: (refreshing: boolean) => set({ appRefreshing: refreshing }),
+
     syncApiGroups: (incoming: Group[]) =>
       set((s) => {
         const byId = new Map(s.groups.map((g) => [g.id, g]));
@@ -281,7 +355,9 @@ function createActions(
     clearMonthlyBudget: () => set({ monthlyBudget: null, monthlyBudgetDraft: "", editingMonthlyBudget: false }),
 
     // capture
-    openCapture: () => set({ capture: { stage: "input", mode: "say", text: "", amount: "", draft: null } }),
+    openCapture: () =>
+      set({ capture: { stage: "input", mode: "say", text: "", amount: "", draft: null } }),
+    openGroupExpense: openGroupExpenseAction,
     closeCapture: () => set({ capture: null }),
     modeSay: () => set((s) => (s.capture ? { capture: { ...s.capture, mode: "say" } } : {})),
     modeManual: () => set((s) => (s.capture ? { capture: { ...s.capture, mode: "manual" } } : {})),
@@ -294,12 +370,37 @@ function createActions(
         return;
       }
       set((s) => {
+        const boundGroup = s.capture?.groupId
+          ? s.groups.find((g) => g.id === s.capture!.groupId)
+          : null;
         const p = parse(text, s.groups);
         if (p.lowConf) {
           return {
             capture: { ...s.capture!, mode: "manual", stage: "input", amount: "", prefill: { title: p.title, cat: p.cat } },
             ...toastPatch("Add the amount to finish"),
           };
+        }
+        if (boundGroup) {
+          const members = boundGroup.members.map((m) => m.name);
+          const roster = new Set(members);
+          const picked = p.parts.filter((n) => roster.has(n));
+          const parts = picked.length ? picked : members.length ? members : ["You"];
+          const payer = roster.has(p.payer) ? p.payer : "You";
+          const finalParts = [...new Set(parts.includes(payer) ? parts : [payer, ...parts])];
+          const draft: Draft = {
+            title: p.title,
+            total: p.amount,
+            payer,
+            parts: finalParts,
+            allMembers: members.length ? members : ["You"],
+            method: "equal",
+            cat: p.cat,
+            group: boundGroup.name,
+            isShared: true,
+            unresolved: (p.unresolved || []).filter((n) => !roster.has(n)),
+            owed: equalOwed(p.amount, finalParts),
+          };
+          return { capture: { ...s.capture!, stage: "draft", draft } };
         }
         const allMembers = p.group ? p.group.members.map((m) => m.name) : [...new Set([p.payer, ...p.parts])];
         const parts = p.parts.length ? p.parts : [p.payer];
@@ -330,9 +431,28 @@ function createActions(
         return { capture: { ...s.capture, amount: amt } };
       }),
     confirmManual: () => {
-      const amt = parseFloat(getState().capture?.amount || "0") || 0;
+      const cap = getState().capture;
+      const amt = parseFloat(cap?.amount || "0") || 0;
       if (!amt) {
         set(toastPatch("Enter an amount"));
+        return;
+      }
+      if (cap?.groupId) {
+        const group = getState().groups.find((g) => g.id === cap.groupId);
+        if (!group) {
+          set(toastPatch("Group not found — try again"));
+          return;
+        }
+        set({
+          capture: {
+            ...cap,
+            stage: "draft",
+            draft: draftForGroup(group, amt, {
+              title: cap.prefill?.title || "Expense",
+              cat: cap.prefill?.cat || "other",
+            }),
+          },
+        });
         return;
       }
       const handlers = expenseHandlersRef?.current;
@@ -353,6 +473,43 @@ function createActions(
         const total = d.total;
         const sum = Object.values(d.owed).reduce((x, y) => x + y, 0);
         if (d.method === "exact" && sum !== total) return toastPatch("Split is off by " + taka(Math.abs(total - sum)));
+        const isGroupExpense = !!(s.capture?.groupId || d.group);
+        if (isGroupExpense) {
+          const groupHandlers = groupHandlersRef?.current;
+          const group = s.capture?.groupId
+            ? s.groups.find((g) => g.id === s.capture!.groupId)
+            : s.groups.find((g) => g.name === d.group);
+          if (groupHandlers?.isLive) {
+            if (!group) {
+              return toastPatch("Open the group first, then add the expense");
+            }
+            const body = draftToCreateExpenseBody(d, group);
+            if (!body) {
+              return toastPatch("Couldn't match members — open the group and try again");
+            }
+            const returnScreen = s.capture?.returnScreen || "group";
+            void groupHandlers
+              .createGroupExpense(group.id, body)
+              .then(() =>
+                setState((cur) => ({
+                  ...cur,
+                  capture: null,
+                  screen: returnScreen,
+                  activeGroup: group.id,
+                  toast: `Added to ${group.name}`,
+                  notifications: [
+                    makeNotif(
+                      groupExpenseNotifText(d.title || "Expense", taka(total), group.name),
+                      "expense",
+                    ),
+                    ...cur.notifications,
+                  ],
+                })),
+              )
+              .catch((error) => set(toastPatch(groupHandlers.getErrorMessage(error))));
+            return {};
+          }
+        }
         if (!d.isShared && handlers?.isLive) {
           void handlers
             .createPersonal({ amount: total, description: d.title || "Expense" })
@@ -417,7 +574,7 @@ function createActions(
           const youPaid = d.payer === "You";
           entry = {
             id: "n" + Date.now(), when: "Today", time: "just now", title: d.title || "Expense",
-            sub: (d.group ? d.group + " · " : "") + (youPaid ? "you paid " + taka(total) : d.payer + " paid · your share"),
+            sub: (d.group ? d.group + " · " : "") + (youPaid ? "you paid " + taka(total) : d.payer + " paid"),
             cat: d.cat, amount: youPaid ? total - yourShare : yourShare, kind: youPaid ? "owed" : "share", fresh: true,
             total, paidBy: d.payer, group: d.group ?? undefined, parts: d.parts.map((p) => ({ name: p, owed: d.owed[p] || 0 })), yourShare,
           };
@@ -682,7 +839,7 @@ function createActions(
         };
       });
     },
-    addToGroup: (gName: string) => { set({ screen: "home" }); set({ capture: { stage: "input", mode: "say", text: "", amount: "", draft: null } }); flash("Adding to " + gName); },
+    addToGroup: () => openGroupExpenseAction(),
   };
 }
 
@@ -732,13 +889,19 @@ function buildView(s: TallyState, a: Actions) {
   const g = s.groups.find((x) => x.id === s.activeGroup) ?? s.groups[0] ?? { id: "", name: "", members: [] };
 
   // overall standing across groups
-  let ovOwed = 0, ovOwe = 0;
-  for (const gr of s.groups) { const v = groupView(gr); ovOwed += v.owed; ovOwe += v.owe; }
+  let ovOwed = 0;
+  let ovOwe = 0;
+  for (const gr of s.groups) {
+    const st = groupStandingForHome(gr);
+    ovOwed += st.owed;
+    ovOwe += st.owe;
+  }
   const gv = groupView(g);
+  const groupStanding = g.members.length > 1 ? gv.standing : (g.yourBalance ?? gv.standing);
 
-  // home stream — API personal expenses plus any in-session shared entries
+  // home stream — personal ledger only (group detail keeps its own activity list)
   const q = s.search.trim().toLowerCase();
-  const feedBase = [...s.apiPersonalEntries, ...s.apiGroupEntries, ...s.extraEntries];
+  const feedBase = [...s.apiPersonalEntries, ...s.extraEntries];
   const buildStream = () => {
     const all = feedBase.filter(
       (e) => !q || (e.title + " " + (e.sub || "")).toLowerCase().includes(q),
@@ -808,8 +971,9 @@ function buildView(s: TallyState, a: Actions) {
     };
   });
 
-  const allE = feedBase;
-  const groupActivity = allE.filter((e) => e.group === g.name).map((e) => {
+  const groupActivity = s.apiGroupEntries
+    .filter((e) => e.group === g.name)
+    .map((e) => {
     const c = catColor[e.cat] || "#8A847A";
     const amountText = e.kind === "owed" ? "+" + taka(e.amount) : taka(e.amount);
     const amountColor = e.kind === "owed" ? "#3F8E5B" : "var(--ink)";
@@ -903,18 +1067,32 @@ function buildView(s: TallyState, a: Actions) {
       rows, statusText, statusColor, unresolved,
       equalBg: dd.method === "equal" ? "var(--surface-card)" : "transparent", equalColor: dd.method === "equal" ? "var(--ink)" : "var(--muted)",
       exactBg: dd.method === "exact" ? "var(--surface-card)" : "transparent", exactColor: dd.method === "exact" ? "var(--ink)" : "var(--muted)",
-      confirmBg: valid ? "var(--chip-on-bg)" : "#C9C2B6", confirmLabel: valid ? "Confirm" : "Balance the split first",
+      confirmBg: valid ? "var(--chip-on-bg)" : "#C9C2B6",
+      confirmLabel: valid
+        ? s.capture?.groupId
+          ? "Add to group"
+          : "Confirm"
+        : "Balance the split first",
       editOwed: (name: string, v: string) => a.editDraftOwed(name, v),
     };
   }
   if (d) draftView = buildDraft(d);
 
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map((k) => ({ label: k, color: k === "." || k === "⌫" ? "var(--muted)" : "var(--ink)", press: () => a.pressKey(k) }));
-  const sayExamples = [
-    { label: "coffee 120", txt: "coffee 120" },
-    { label: "lunch 350", txt: "lunch 350" },
-    { label: "groceries 1200", txt: "groceries 1200" },
-  ].map((e) => ({ label: e.label, use: () => a.useExample(e.txt) }));
+  const captureGroup = cap0?.groupId ? s.groups.find((g) => g.id === cap0.groupId) : null;
+  const sayExamples = (
+    cap0?.groupId
+      ? [
+          { label: "dinner 960", txt: "dinner 960, I paid, split everyone" },
+          { label: "groceries 1200", txt: "groceries 1200, split equally" },
+          { label: "uber 350", txt: "uber 350, Alex paid" },
+        ]
+      : [
+          { label: "coffee 120", txt: "coffee 120" },
+          { label: "lunch 350", txt: "lunch 350" },
+          { label: "groceries 1200", txt: "groceries 1200" },
+        ]
+  ).map((e) => ({ label: e.label, use: () => a.useExample(e.txt) }));
 
   // ---- entry detail ----
   const entry = s.entry;
@@ -1066,6 +1244,8 @@ function buildView(s: TallyState, a: Actions) {
 
   return {
     userName, accent,
+    appLoading: s.appLoading,
+    appRefreshing: s.appRefreshing,
     // screen flags
     screen,
     isHome: screen === "home", isSpending: screen === "spending", isGroups: screen === "groups", isGroup: screen === "group",
@@ -1077,6 +1257,9 @@ function buildView(s: TallyState, a: Actions) {
     capture: cap0, captureOpen: !!cap0, captureInput: cap0?.stage === "input", captureDraft: cap0?.stage === "draft",
     modeIsSay: cap0?.mode === "say", modeIsManual: cap0?.mode === "manual",
     captureText: cap0?.text || "", manualAmount: cap0?.amount || "0",
+    captureGroupName: captureGroup?.name || "",
+    captureIsGroupExpense: !!cap0?.groupId,
+    openGroupExpense: a.openGroupExpense,
     sayBg: cap0?.mode === "say" ? "var(--surface-card)" : "transparent", sayColor: cap0?.mode === "say" ? "var(--ink)" : "var(--muted)",
     manualBg: cap0?.mode === "manual" ? "var(--surface-card)" : "transparent", manualColor: cap0?.mode === "manual" ? "var(--ink)" : "var(--muted)",
 
@@ -1123,8 +1306,7 @@ function buildView(s: TallyState, a: Actions) {
 
     // groups
     groupCards: s.groups.map((gr) => {
-      const v = groupView(gr);
-      const st = gr.members.length > 1 ? v.standing : (gr.yourBalance ?? v.standing);
+      const st = groupStandingForHome(gr);
       const membersLabel =
         gr.memberCount && gr.members.length <= 1
           ? `${gr.memberCount} member${gr.memberCount === 1 ? "" : "s"}`
@@ -1133,9 +1315,9 @@ function buildView(s: TallyState, a: Actions) {
         id: gr.id,
         name: gr.name,
         members: membersLabel,
-        color: st > 0 ? "#3F8E5B" : st < 0 ? "#C2693E" : "#8A847A",
-        label: st > 0 ? "YOU’RE OWED" : st < 0 ? "YOU OWE" : "SETTLED",
-        amountText: st === 0 ? "—" : taka(Math.abs(st)),
+        color: st.standing > 0 ? "#3F8E5B" : st.standing < 0 ? "#C2693E" : "#8A847A",
+        label: st.standing > 0 ? "YOU’RE OWED" : st.standing < 0 ? "YOU OWE" : "SETTLED",
+        amountText: st.standing === 0 ? "—" : taka(Math.abs(st.standing)),
         open: () => a.openGroupById(gr.id),
       };
     }),
@@ -1144,9 +1326,9 @@ function buildView(s: TallyState, a: Actions) {
       g.memberCount && g.members.length <= 1
         ? `${g.memberCount} members`
         : g.members.map((m) => m.name).join(", "),
-    groupStandingLabel: gv.standing > 0 ? "Overall, you’re owed" : gv.standing < 0 ? "Overall, you owe" : "You’re all settled",
-    groupStandingText: gv.standing === 0 ? "৳0" : taka(Math.abs(gv.standing)),
-    groupStandingColor: gv.standing > 0 ? "#3F8E5B" : gv.standing < 0 ? "#C2693E" : "#8A847A",
+    groupStandingLabel: groupStanding > 0 ? "Overall, you’re owed" : groupStanding < 0 ? "Overall, you owe" : "You’re all settled",
+    groupStandingText: groupStanding === 0 ? "৳0" : taka(Math.abs(groupStanding)),
+    groupStandingColor: groupStanding > 0 ? "#3F8E5B" : groupStanding < 0 ? "#C2693E" : "#8A847A",
     groupBalances, groupActivity, groupHasActivity: groupActivity.length > 0,
     settleTx, settleSummary: settleTx.length === 1 ? "One payment clears everyone." : settleTx.length + " payments clear everyone.",
 

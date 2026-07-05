@@ -26,21 +26,28 @@ export function Capture() {
           {grip}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 24px 8px" }}>
             <span onClick={actions.closeCapture} style={{ font: "600 15px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>Cancel</span>
-            <div style={{ display: "flex", background: "var(--line)", borderRadius: 999, padding: 3 }}>
-              <span data-testid="capture-say-mode" onClick={actions.modeSay} style={{ font: "600 13px var(--font-sans)", padding: "7px 15px", borderRadius: 999, cursor: "pointer", background: vm.sayBg, color: vm.sayColor }}>Say it</span>
-              <span data-testid="capture-manual-mode" onClick={actions.modeManual} style={{ font: "600 13px var(--font-sans)", padding: "7px 15px", borderRadius: 999, cursor: "pointer", background: vm.manualBg, color: vm.manualColor }}>Type amount</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              {vm.captureIsGroupExpense && (
+                <span style={{ font: "600 11px var(--font-sans)", letterSpacing: ".08em", textTransform: "uppercase", color: "#3F8E5B" }}>{vm.captureGroupName}</span>
+              )}
+              <div style={{ display: "flex", background: "var(--line)", borderRadius: 999, padding: 3 }}>
+                <span data-testid="capture-say-mode" onClick={actions.modeSay} style={{ font: "600 13px var(--font-sans)", padding: "7px 15px", borderRadius: 999, cursor: "pointer", background: vm.sayBg, color: vm.sayColor }}>Say it</span>
+                <span data-testid="capture-manual-mode" onClick={actions.modeManual} style={{ font: "600 13px var(--font-sans)", padding: "7px 15px", borderRadius: 999, cursor: "pointer", background: vm.manualBg, color: vm.manualColor }}>Type amount</span>
+              </div>
             </div>
             <span style={{ width: 46 }} />
           </div>
 
           {vm.modeIsSay && (
             <div style={{ padding: "14px 24px 0" }}>
-              <div style={{ ...serif, fontSize: 24, lineHeight: 1.25, color: "var(--ink)" }}>Tell Tally what happened.</div>
+              <div style={{ ...serif, fontSize: 24, lineHeight: 1.25, color: "var(--ink)" }}>
+                {vm.captureIsGroupExpense ? "What did the group spend?" : "Tell Tally what happened."}
+              </div>
               <textarea
                 data-testid="capture-text"
                 onChange={(e) => actions.onCaptureInput(e.target.value)}
                 value={vm.captureText}
-                placeholder="dinner 500, I paid, split me and Alex"
+                placeholder={vm.captureIsGroupExpense ? "dinner 500, I paid, split me and Alex" : "dinner 500, I paid, split me and Alex"}
                 style={{ width: "100%", marginTop: 14, minHeight: 92, resize: "none", border: "1px solid var(--line-strong)", borderRadius: 16, padding: 15, font: "500 16px var(--font-sans)", color: "var(--ink)", background: "var(--surface-card)", outline: "none", lineHeight: 1.5 }}
               />
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
@@ -71,7 +78,7 @@ export function Capture() {
                   <div key={k.label} data-testid={`keypad-${k.label === "⌫" ? "del" : k.label === "." ? "dot" : k.label}`} onClick={k.press} style={{ textAlign: "center", padding: "14px 0", font: "400 26px var(--font-sans)", color: k.color, cursor: "pointer" }}>{k.label}</div>
                 ))}
               </div>
-              <div data-testid="manual-confirm" onClick={actions.confirmManual} style={{ marginTop: 6, background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>Add expense</div>
+              <div data-testid="manual-confirm" onClick={actions.confirmManual} style={{ marginTop: 6, background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>{vm.captureIsGroupExpense ? "Next — split it" : "Add expense"}</div>
             </div>
           )}
         </div>
@@ -100,7 +107,7 @@ export function Capture() {
               </div>
             ))}
 
-            {vm.draft.isShared && (
+            {(vm.draft.isShared || vm.captureIsGroupExpense) && (
               <>
                 <div style={{ font: "600 11px var(--font-sans)", letterSpacing: ".1em", textTransform: "uppercase", color: "var(--muted-2)", margin: "16px 0 8px" }}>Who paid</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
@@ -142,8 +149,11 @@ export function Capture() {
               </>
             )}
 
-            {vm.draft.isPersonal && (
+            {vm.draft.isPersonal && !vm.captureIsGroupExpense && (
               <div style={{ marginTop: 10, fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>Just you — this goes straight into your personal spending.</div>
+            )}
+            {vm.captureIsGroupExpense && (
+              <div style={{ marginTop: 10, fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>This expense is split in <b>{vm.captureGroupName}</b>. Everyone&apos;s share updates their balance.</div>
             )}
 
             <div data-testid="capture-confirm-draft" onClick={actions.confirmDraft} style={{ margin: "18px 0 4px", background: vm.draft.confirmBg, color: "var(--surface)", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>{vm.draft.confirmLabel}</div>

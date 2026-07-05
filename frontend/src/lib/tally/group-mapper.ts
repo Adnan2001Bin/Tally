@@ -111,7 +111,7 @@ export function apiGroupExpenseToEntry(
     title: expense.description,
     sub:
       (groupName ? groupName + " · " : "") +
-      (youPaid ? "you paid ৳" + expense.total.toLocaleString("en-BD") : payerName + " paid · your share"),
+      (youPaid ? "you paid ৳" + expense.total.toLocaleString("en-BD") : payerName + " paid"),
     cat: expense.category ?? "other",
     amount: youPaid ? expense.total - yourShare : yourShare,
     kind: youPaid ? "owed" : "share",

@@ -6,6 +6,7 @@ import { getStoredUser } from "@/lib/auth/auth-storage";
 import { TallyAuthProvider } from "@/lib/tally/auth-bridge";
 import { ExpensesBridge } from "@/lib/tally/expenses-bridge";
 import { GroupsBridge } from "@/lib/tally/groups-bridge";
+import { AppSyncBridge } from "@/lib/tally/app-sync-bridge";
 import { InviteBridge } from "@/lib/tally/invite-bridge";
 import { ProfileBridge } from "@/lib/tally/profile-bridge";
 import type { ExpenseHandlers } from "@/lib/tally/expense-handlers";
@@ -29,6 +30,7 @@ function TallyAppInner() {
       >
         <ExpensesBridge handlersRef={expenseHandlersRef} />
         <GroupsBridge handlersRef={groupHandlersRef} />
+        <AppSyncBridge />
         <InviteBridge />
         <ProfileBridge />
         <ThemeProvider>

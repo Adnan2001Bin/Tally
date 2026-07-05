@@ -64,6 +64,8 @@ export interface Entry {
   group?: string;
   parts?: EntryPart[];
   yourShare?: number;
+  /** Links a personal-ledger mirror back to the group expense. */
+  sourceGroupExpenseId?: string;
 }
 
 export interface Loan {
@@ -110,6 +112,10 @@ export interface Capture {
   amount: string;
   draft: Draft | null;
   prefill?: { title: string; cat: string };
+  /** When set, expense is saved to this group (not personal). */
+  groupId?: string;
+  /** Screen to return to after saving a group expense. */
+  returnScreen?: Screen;
 }
 
 export type NotifKind = "expense" | "settle" | "dispute" | "group" | "join";
@@ -171,6 +177,10 @@ export interface TallyState {
   }>;
   search: string; // home feed filter
   displayName: string | null; // greeting override (signed-in UI)
+  /** True while initial API data (expenses + groups) is loading. */
+  appLoading: boolean;
+  /** True during background refetch of API data. */
+  appRefreshing: boolean;
 
   // ---- profile + settings ----
   profile: ProfileVM | null;

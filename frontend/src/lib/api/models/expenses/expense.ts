@@ -6,6 +6,8 @@ export type Expense = {
   currency: string;
   created_at: string;
   updated_at: string;
+  /** Set when this row mirrors a group expense share. */
+  source_group_expense_id?: string | null;
 };
 
 export type CreateExpenseBody = {

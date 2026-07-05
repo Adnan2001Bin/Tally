@@ -23,9 +23,43 @@ function formatWhen(iso: string): { when: string; time: string } {
   return { when, time };
 }
 
+/** Parse backend mirror rows: "Group share: Grocery (bachelors)" */
+export function parseGroupShareDescription(
+  description: string,
+): { title: string; groupName: string } | null {
+  const match = description.match(/^Group share:\s*(.+?)\s*\(([^)]+)\)\s*$/);
+  if (!match) return null;
+  return { title: match[1].trim(), groupName: match[2].trim() };
+}
+
 /** Map API expense → UI entry (personal ledger row). */
 export function apiExpenseToEntry(expense: Expense): Entry {
   const { when, time } = formatWhen(expense.created_at);
+  const groupShare =
+    expense.source_group_expense_id != null
+      ? parseGroupShareDescription(expense.description)
+      : parseGroupShareDescription(expense.description);
+
+  if (groupShare || expense.source_group_expense_id) {
+    const title = groupShare?.title ?? expense.description.replace(/^Group share:\s*/i, "").trim();
+    const groupName = groupShare?.groupName ?? "Group";
+    return {
+      id: expense.id,
+      when,
+      time,
+      title,
+      sub: groupName,
+      cat: "other",
+      amount: expense.amount,
+      kind: "share",
+      group: groupName,
+      yourShare: expense.amount,
+      at: expense.created_at,
+      sourceGroupExpenseId: expense.source_group_expense_id ?? undefined,
+      note: expense.currency !== "BDT" ? expense.currency : undefined,
+    };
+  }
+
   return {
     id: expense.id,
     when,

@@ -333,7 +333,7 @@ export function GroupDetail() {
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span data-testid="group-share-invite" onClick={actions.openGroupInvite} style={{ font: "600 14px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>Share</span>
           <span data-testid="group-history" onClick={vm.goAudit} style={{ font: "600 14px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>History</span>
-          <span data-testid="group-add-expense" onClick={() => actions.addToGroup(vm.groupName)} style={{ font: "600 14px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}>+ Add expense</span>
+          <span data-testid="group-add-expense" onClick={() => actions.openGroupExpense()} style={{ font: "600 14px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}>+ Add expense</span>
         </div>
       </div>
       <div style={{ padding: "12px 26px 20px", borderBottom: "1px solid var(--line)" }}>
@@ -383,7 +383,8 @@ export function GroupDetail() {
           <div style={{ font: "600 16px var(--font-sans)", color: b.color }}>{b.amountText}</div>
         </div>
       ))}
-      <div style={{ padding: "18px 24px 0" }}>
+      <div style={{ padding: "18px 24px 0", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div data-testid="group-add-expense-btn" onClick={() => actions.openGroupExpense()} style={{ background: "#C2693E", color: "#fff", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>Add expense</div>
         <div data-testid="group-settle-up" onClick={vm.goSettle} style={{ background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>Settle up</div>
       </div>
       {vm.groupHasActivity && (
