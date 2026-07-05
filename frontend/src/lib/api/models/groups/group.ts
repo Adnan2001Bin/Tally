@@ -92,8 +92,13 @@ export type JoinRequest = {
   group_id: string;
   user_id: string;
   username: string;
+  display_name: string;
   status: "pending" | "accepted" | "rejected";
   created_at: string;
+};
+
+export type JoinRequestsList = {
+  requests: JoinRequest[];
 };
 
 export type RespondJoinRequestBody = {

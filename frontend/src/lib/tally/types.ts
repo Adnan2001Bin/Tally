@@ -162,6 +162,13 @@ export interface TallyState {
   notifications: Notification[];
   disputed: Record<string, boolean>; // entry id → disputed
   groupCodes: Record<string, string>; // group id → invite code
+  /** Pending invite-link join requests for the active group (admin view). */
+  joinRequests: Array<{
+    id: string;
+    username: string;
+    display_name: string;
+    created_at: string;
+  }>;
   search: string; // home feed filter
   displayName: string | null; // greeting override (signed-in UI)
 

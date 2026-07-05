@@ -9,6 +9,7 @@ import {
   useJoinGroupMutation,
 } from "@/lib/hooks/use-groups";
 import { getGroups } from "@/lib/api/generated/groups/groups";
+import type { GroupDetail } from "@/lib/api/models/groups/group";
 import {
   createGroupBody,
   detailToGroup,
@@ -18,6 +19,12 @@ import type { GroupHandlers } from "@/lib/tally/group-handlers";
 import { useTally } from "@/lib/tally/store";
 
 const groupsApi = getGroups();
+
+function canManageJoinRequests(detail: GroupDetail, userId?: string): boolean {
+  if (!userId) return false;
+  const me = detail.members.find((m) => m.user_id === userId);
+  return me?.role === "owner" || me?.role === "admin";
+}
 
 type GroupsBridgeProps = {
   handlersRef: MutableRefObject<GroupHandlers | null>;
@@ -37,10 +44,29 @@ export function GroupsBridge({ handlersRef }: GroupsBridgeProps) {
     : null;
 
   useEffect(() => {
+    const syncJoinRequestsForDetail = async (detail: GroupDetail) => {
+      if (!canManageJoinRequests(detail, storedUser?.id)) {
+        actions.syncJoinRequests([]);
+        return;
+      }
+      const { requests } = await groupsApi.listJoinRequests(detail.id);
+      actions.syncJoinRequests(
+        requests.map((r) => ({
+          id: r.id,
+          username: r.username,
+          display_name: r.display_name,
+          created_at: r.created_at,
+        })),
+      );
+    };
+
     handlersRef.current = {
       isLive: true,
       createGroup: async (input) => {
         const created = await createGroupMutation.mutateAsync(createGroupBody(input));
+        const detail = await groupsApi.getGroup(created.id);
+        actions.syncGroupDetail(detail, currentUser);
+        await syncJoinRequestsForDetail(detail);
         return {
           id: created.id,
           name: created.name,
@@ -55,6 +81,13 @@ export function GroupsBridge({ handlersRef }: GroupsBridgeProps) {
       loadGroupDetail: async (groupId) => {
         const detail = await groupsApi.getGroup(groupId);
         actions.syncGroupDetail(detail, currentUser);
+        await syncJoinRequestsForDetail(detail);
+      },
+      respondJoinRequest: async (groupId, requestId, action) => {
+        await groupsApi.respondJoinRequest(groupId, requestId, { action });
+        const detail = await groupsApi.getGroup(groupId);
+        actions.syncGroupDetail(detail, currentUser);
+        await syncJoinRequestsForDetail(detail);
       },
       createGroupExpense: async (groupId, body) => {
         await createExpenseMutation.mutateAsync({ groupId, body });
@@ -83,6 +116,7 @@ export function GroupsBridge({ handlersRef }: GroupsBridgeProps) {
     currentUser,
     handlersRef,
     joinGroupMutation,
+    storedUser?.id,
   ]);
 
   useEffect(() => {

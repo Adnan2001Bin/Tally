@@ -44,6 +44,7 @@ const initialState: TallyState = {
   notifications: [],
   disputed: {},
   groupCodes: {},
+  joinRequests: [],
   search: "",
   displayName: null,
   profile: null,
@@ -118,7 +119,7 @@ function createActions(
     go,
     flash,
     openGroupById: (id: string) => {
-      set({ activeGroup: id, screen: "group" });
+      set({ activeGroup: id, screen: "group", joinRequests: [] });
       const handlers = groupHandlersRef?.current;
       if (handlers?.isLive) {
         void handlers.loadGroupDetail(id).catch((error) => {
@@ -213,7 +214,34 @@ function createActions(
 
     syncApiPersonalEntries: (entries: Entry[]) => set({ apiPersonalEntries: entries }),
 
-    syncApiGroups: (groups: Group[]) => set({ groups }),
+    syncApiGroups: (incoming: Group[]) =>
+      set((s) => {
+        const byId = new Map(s.groups.map((g) => [g.id, g]));
+        const groups = incoming.map((ig) => {
+          const existing = byId.get(ig.id);
+          if (!existing) return ig;
+          return {
+            ...existing,
+            ...ig,
+            members: existing.members.length > ig.members.length ? existing.members : ig.members,
+            inviteCode: ig.inviteCode ?? existing.inviteCode,
+          };
+        });
+        const groupCodes = { ...s.groupCodes };
+        for (const g of groups) {
+          if (g.inviteCode) groupCodes[g.id] = g.inviteCode;
+        }
+        return { groups, groupCodes };
+      }),
+
+    syncJoinRequests: (
+      requests: Array<{
+        id: string;
+        username: string;
+        display_name: string;
+        created_at: string;
+      }>,
+    ) => set({ joinRequests: requests }),
 
     syncGroupDetail: (
       detail: GroupDetail,
@@ -549,6 +577,10 @@ function createActions(
               screen: "invite",
               newGroupName: "",
               newGroupMembers: [],
+              groupCodes: {
+                ...getState().groupCodes,
+                [created.id]: created.invite_code,
+              },
               notifications: [
                 makeNotif(`You created ${created.name}`, "group"),
                 ...getState().notifications,
@@ -577,15 +609,40 @@ function createActions(
         };
       });
     },
+    openGroupInvite: () =>
+      set((s) => {
+        const g = s.groups.find((x) => x.id === s.activeGroup);
+        const code = g?.inviteCode || s.groupCodes[g?.id ?? ""] || "";
+        if (!g || !code) return toastPatch("Invite link isn't available yet");
+        return {
+          inviteFor: { name: g.name, code },
+          screen: "invite" as Screen,
+        };
+      }),
     copyInvite: () =>
       set((s) => {
-        const code = s.inviteFor?.code || "";
+        const g = s.groups.find((x) => x.id === s.activeGroup);
+        const code =
+          s.inviteFor?.code || g?.inviteCode || s.groupCodes[g?.id ?? ""] || "";
         const link = inviteLinkForCode(code);
         if (typeof navigator !== "undefined" && navigator.clipboard) {
           navigator.clipboard.writeText(link).catch(() => {});
         }
         return toastPatch("Invite link copied");
       }),
+    respondJoinRequest: (requestId: string, action: "accept" | "reject") => {
+      const gid = getState().activeGroup;
+      const handlers = groupHandlersRef?.current;
+      if (!handlers?.isLive || !gid) return;
+      void handlers
+        .respondJoinRequest(gid, requestId, action)
+        .then(() =>
+          set(
+            toastPatch(action === "accept" ? "Member added to the group" : "Join request declined"),
+          ),
+        )
+        .catch((error) => set(toastPatch(handlers.getErrorMessage(error))));
+    },
     joinGroup: () => {
       const code = (getState().joinCode || "").trim();
       if (code.length < 4) {
@@ -1093,6 +1150,24 @@ function buildView(s: TallyState, a: Actions) {
     groupBalances, groupActivity, groupHasActivity: groupActivity.length > 0,
     settleTx, settleSummary: settleTx.length === 1 ? "One payment clears everyone." : settleTx.length + " payments clear everyone.",
 
+    canManageJoinRequests:
+      g.members.find((m) => m.name === "You")?.role === "owner" ||
+      g.members.find((m) => m.name === "You")?.role === "admin",
+    joinRequestRows: s.joinRequests.map((r) => ({
+      id: r.id,
+      name: r.display_name?.trim() || r.username,
+      username: r.username,
+      when: new Date(r.created_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      accept: () => a.respondJoinRequest(r.id, "accept"),
+      reject: () => a.respondJoinRequest(r.id, "reject"),
+    })),
+    groupHasJoinRequests: s.joinRequests.length > 0,
+    openGroupInvite: a.openGroupInvite,
+    groupInviteCode: g.inviteCode || s.groupCodes[g.id] || "",
+
     // draft
     draft: draftView, keys, sayExamples,
 
@@ -1121,9 +1196,12 @@ function buildView(s: TallyState, a: Actions) {
     baDirLentLabel: ba?.type === "item" ? "I lent it out" : "I lent", baDirBorrowedLabel: ba?.type === "item" ? "I borrowed it" : "I borrowed",
 
     // invite
-    inviteName: s.inviteFor?.name || "",
-    inviteCode: s.inviteFor?.code || "",
-    inviteLink: inviteLinkForCode(s.inviteFor?.code || ""),
+    inviteName: s.inviteFor?.name || g.name || "",
+    inviteCode:
+      s.inviteFor?.code || g.inviteCode || s.groupCodes[g.id] || "",
+    inviteLink: inviteLinkForCode(
+      s.inviteFor?.code || g.inviteCode || s.groupCodes[g.id] || "",
+    ),
 
     // offline
     offline: s.offline,

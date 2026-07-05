@@ -22,6 +22,11 @@ export type GroupHandlers = {
   createGroup: (input: CreateGroupInput) => Promise<{ id: string; name: string; invite_code: string }>;
   joinGroup: (input: JoinGroupInput) => Promise<void>;
   loadGroupDetail: (groupId: string) => Promise<void>;
+  respondJoinRequest: (
+    groupId: string,
+    requestId: string,
+    action: "accept" | "reject",
+  ) => Promise<void>;
   createGroupExpense: (groupId: string, body: CreateGroupExpenseBody) => Promise<void>;
   createSettlement: (input: SettleGroupInput) => Promise<void>;
   getErrorMessage: (error: unknown) => string;

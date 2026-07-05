@@ -331,6 +331,7 @@ export function GroupDetail() {
       <div style={{ padding: "14px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <BackLink label="‹ Groups" onClick={vm.goGroups} testid="group-back" />
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span data-testid="group-share-invite" onClick={actions.openGroupInvite} style={{ font: "600 14px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>Share</span>
           <span data-testid="group-history" onClick={vm.goAudit} style={{ font: "600 14px var(--font-sans)", color: "var(--muted)", cursor: "pointer" }}>History</span>
           <span data-testid="group-add-expense" onClick={() => actions.addToGroup(vm.groupName)} style={{ font: "600 14px var(--font-sans)", color: "#C2693E", cursor: "pointer" }}>+ Add expense</span>
         </div>
@@ -341,6 +342,34 @@ export function GroupDetail() {
         <div style={{ ...serif, fontSize: 17, color: "var(--ink-soft)", marginTop: 20 }}>{vm.groupStandingLabel}</div>
         <div style={{ ...serif, fontSize: 52, lineHeight: 1, marginTop: 2, color: vm.groupStandingColor }}>{vm.groupStandingText}</div>
       </div>
+      {vm.canManageJoinRequests && (
+        <>
+          <SectionLabel>Join requests</SectionLabel>
+          <div style={{ padding: "0 22px 8px", fontSize: 12.5, color: "var(--muted-2)", lineHeight: 1.5 }}>
+            People who used your invite link and are waiting for approval.
+          </div>
+          {vm.joinRequestRows.length === 0 ? (
+            <div data-testid="join-requests-empty" style={{ margin: "0 22px 12px", padding: "18px 16px", background: "var(--surface-card)", border: "1px solid var(--line)", borderRadius: 16, fontSize: 14, color: "var(--muted-2)", textAlign: "center" }}>
+              No pending requests
+            </div>
+          ) : (
+            vm.joinRequestRows.map((req) => (
+              <div key={req.id} data-testid={`join-request-${req.id}`} style={{ margin: "0 22px 12px", background: "var(--surface-card)", border: "1px solid var(--line)", borderRadius: 18, padding: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <div>
+                    <div style={{ font: "600 16px var(--font-sans)" }}>{req.name}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>@{req.username} · {req.when}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                  <div data-testid={`join-request-accept-${req.id}`} onClick={req.accept} style={{ flex: 1, textAlign: "center", background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", borderRadius: 13, padding: 12, font: "600 14px var(--font-sans)", cursor: "pointer" }}>Accept</div>
+                  <div data-testid={`join-request-decline-${req.id}`} onClick={req.reject} style={{ flex: 1, textAlign: "center", background: "var(--surface-card)", border: "1px solid var(--line-strong)", color: "var(--ink-soft)", borderRadius: 13, padding: 12, font: "600 14px var(--font-sans)", cursor: "pointer" }}>Decline</div>
+                </div>
+              </div>
+            ))
+          )}
+        </>
+      )}
       <SectionLabel>Who&apos;s who</SectionLabel>
       {vm.groupBalances.map((b) => (
         <div key={b.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 26px" }}>

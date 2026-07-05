@@ -9,6 +9,7 @@ import type {
   GroupsList,
   JoinGroupBody,
   JoinRequest,
+  JoinRequestsList,
   RespondJoinRequestBody,
 } from "../../models/groups/group";
 import { customInstance } from "../../axios-instance";
@@ -40,6 +41,12 @@ export const getGroups = () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: body,
+    });
+
+  const listJoinRequests = (groupId: string) =>
+    customInstance<JoinRequestsList>({
+      url: `/groups/${groupId}/requests`,
+      method: "GET",
     });
 
   const respondJoinRequest = (
@@ -75,6 +82,7 @@ export const getGroups = () => {
     listGroups,
     getGroup,
     joinGroup,
+    listJoinRequests,
     respondJoinRequest,
     createGroupExpense,
     createGroupSettlement,
