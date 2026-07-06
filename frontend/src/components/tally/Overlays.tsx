@@ -149,7 +149,7 @@ export function Capture() {
                           <input value={r.owedVal} onChange={(e) => vm.draft!.editOwed(r.name, e.target.value)} inputMode="numeric" style={{ width: 62, textAlign: "right", border: "1px solid var(--line-strong)", borderRadius: 9, padding: "7px 8px", font: "600 14px var(--font-sans)", color: "var(--ink)", outline: "none", background: "var(--surface)" }} />
                         </div>
                       ) : (
-                        <span style={{ font: "600 14px var(--font-sans)" }}>{r.owedText}</span>
+                        <span style={{ font: "600 14px var(--font-sans)", color: r.isAuto ? "var(--muted)" : "var(--ink)" }}>{r.owedText}</span>
                       )}
                     </div>
                   ))}

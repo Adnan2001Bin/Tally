@@ -71,6 +71,29 @@ function equalOwed(total: number, parts: string[]): Record<string, number> {
   return computeOwed(total, { method: "equal", participants: parts });
 }
 
+/** Exact split: edit the first N−1 members; the last gets the remaining total. */
+function applyExactAutoBalance(
+  total: number,
+  parts: string[],
+  owed: Record<string, number>,
+): Record<string, number> {
+  const o: Record<string, number> = {};
+  for (const p of parts) o[p] = Math.max(0, Math.round(owed[p] || 0));
+  if (parts.length === 0) return o;
+  if (parts.length === 1) {
+    o[parts[0]] = total;
+    return o;
+  }
+  const autoMember = parts[parts.length - 1];
+  const othersSum = parts.slice(0, -1).reduce((sum, p) => sum + (o[p] || 0), 0);
+  o[autoMember] = Math.max(0, total - othersSum);
+  return o;
+}
+
+function exactSplitSum(parts: string[], owed: Record<string, number>): number {
+  return parts.reduce((sum, p) => sum + (owed[p] || 0), 0);
+}
+
 function draftForGroup(
   group: Group,
   total: number,
@@ -580,7 +603,7 @@ function createActions(
         const d = s.capture?.draft;
         if (!d) return {};
         const total = d.total;
-        const sum = Object.values(d.owed).reduce((x, y) => x + y, 0);
+        const sum = exactSplitSum(d.parts, d.owed);
         if (d.method === "exact" && sum !== total) return toastPatch("Split is off by " + taka(Math.abs(total - sum)));
         const isGroupExpense = !!(s.capture?.groupId || d.group);
         if (isGroupExpense) {
@@ -723,6 +746,7 @@ function createActions(
         if (!s.capture?.draft) return {};
         const d = { ...s.capture.draft, method: m };
         if (m === "equal") d.owed = equalOwed(d.total, d.parts);
+        else d.owed = applyExactAutoBalance(d.total, d.parts, d.owed);
         return { capture: { ...s.capture, draft: d } };
       }),
     setDraftPayer: (name: string) =>
@@ -736,7 +760,7 @@ function createActions(
         d.parts = parts;
         d.isShared = parts.length > 1;
         if (d.method === "equal") d.owed = equalOwed(d.total, parts);
-        else { const o: Record<string, number> = {}; parts.forEach((p) => (o[p] = d.owed[p] || 0)); d.owed = o; }
+        else d.owed = applyExactAutoBalance(d.total, parts, d.owed);
         if (!parts.includes(d.payer)) d.payer = parts[0];
         return { capture: { ...s.capture, draft: d } };
       }),
@@ -744,7 +768,10 @@ function createActions(
       set((s) => {
         if (!s.capture?.draft) return {};
         const d = { ...s.capture.draft, method: "exact" as const };
-        d.owed = { ...d.owed, [name]: Math.max(0, Math.round(parseFloat(val) || 0)) };
+        const autoMember = d.parts[d.parts.length - 1];
+        if (d.parts.length > 1 && name === autoMember) return {};
+        const numVal = val.trim() === "" ? 0 : Math.max(0, Math.round(parseFloat(val) || 0));
+        d.owed = applyExactAutoBalance(d.total, d.parts, { ...d.owed, [name]: numVal });
         return { capture: { ...s.capture, draft: d } };
       }),
     assignName: (raw: string, member: string) =>
@@ -755,7 +782,7 @@ function createActions(
         d.unresolved = (d.unresolved || []).filter((u) => u !== raw);
         const o: Record<string, number> = {};
         Object.keys(d.owed).forEach((k) => (o[k === raw ? member : k] = d.owed[k]));
-        d.owed = o;
+        d.owed = d.method === "exact" ? applyExactAutoBalance(d.total, d.parts, o) : o;
         if (d.payer === raw) d.payer = member;
         return { capture: { ...s.capture, draft: d } };
       }),
@@ -1173,16 +1200,28 @@ function buildView(s: TallyState, a: Actions) {
   let draftView: ReturnType<typeof buildDraft> | null = null;
   function buildDraft(dd: Draft) {
     const chip = (on: boolean) => ({ bg: on ? "var(--chip-on-bg)" : "var(--surface-card)", color: on ? "var(--chip-on-fg)" : "var(--ink-soft)", border: on ? "var(--chip-on-bg)" : "var(--line-strong)" });
-    const sum = Object.values(dd.owed).reduce((x, y) => x + y, 0);
+    const autoMember = dd.method === "exact" && dd.parts.length > 1 ? dd.parts[dd.parts.length - 1] : null;
+    const sum = exactSplitSum(dd.parts, dd.owed);
     const valid = dd.method !== "exact" || sum === dd.total;
     const rows = dd.parts.map((p) => {
       const owed = dd.owed[p] || 0;
+      const isAuto = p === autoMember;
       let tag: string, color = "#8A847A";
-      if (p === dd.payer && p === "You") tag = "you paid · your share";
+      if (isAuto) tag = "remainder · fills automatically";
+      else if (p === dd.payer && p === "You") tag = "you paid · your share";
       else if (p === dd.payer) tag = "paid the bill";
       else if (dd.payer === "You") { tag = "owes you"; color = "#C2693E"; }
       else tag = "owes " + dd.payer;
-      return { name: p, tag, color, isExact: dd.method === "exact", isEqual: dd.method !== "exact", owedText: taka(owed), owedVal: String(owed) };
+      return {
+        name: p,
+        tag,
+        color,
+        isExact: dd.method === "exact" && !isAuto,
+        isEqual: dd.method !== "exact",
+        isAuto,
+        owedText: taka(owed),
+        owedVal: String(owed),
+      };
     });
     let statusText: string, statusColor: string;
     if (dd.method === "exact") {
