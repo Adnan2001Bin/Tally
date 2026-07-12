@@ -108,6 +108,34 @@ function rosterFromGroups(groups: Group[]): string[] {
   return [...new Set(groups.flatMap((g) => g.members.map((m) => m.name.toLowerCase())))];
 }
 
+/** "everyone", "all", "roommates" → split across the whole group roster. */
+export function isGroupWideSplitToken(name: string): boolean {
+  const w = name.trim().toLowerCase();
+  return w === "everyone" || w === "all" || w.includes("roommate");
+}
+
+/** Map heuristic/LLM participant names onto a known group roster. */
+export function normalizeGroupSplitParts(
+  parsedParts: string[],
+  parsedUnresolved: string[],
+  members: string[],
+): { parts: string[]; unresolved: string[] } {
+  const roster = new Set(members);
+  if (parsedParts.some(isGroupWideSplitToken)) {
+    return {
+      parts: [...members],
+      unresolved: parsedUnresolved.filter((n) => !isGroupWideSplitToken(n) && !roster.has(n)),
+    };
+  }
+  const picked = parsedParts.filter((n) => roster.has(n));
+  const parts = picked.length ? picked : members;
+  const bogus = parsedParts.filter((n) => !roster.has(n) && !isGroupWideSplitToken(n));
+  return {
+    parts: [...new Set(parts)],
+    unresolved: [...new Set([...parsedUnresolved, ...bogus])].filter((n) => !roster.has(n)),
+  };
+}
+
 export function parse(textRaw: string, groups: Group[]): ParsedFacts {
   const text = (textRaw || "").trim();
   const t = text.toLowerCase();
@@ -152,7 +180,12 @@ export function parse(textRaw: string, groups: Group[]): ParsedFacts {
       if (!w) return;
       if (/paid|spent/.test(w)) return; // payer phrase ("I paid", "spent"), not a participant
       if (w === "me" || w === "i") parts.push("You");
-      else if (w.includes("roommate") && group) (group as Group).members.forEach((mm) => parts.push(mm.name));
+      else if (isGroupWideSplitToken(w)) {
+        const memberNames = group
+          ? (group as Group).members.map((mm) => mm.name)
+          : [...new Set(groups.flatMap((g) => g.members.map((m) => m.name)))];
+        memberNames.forEach((n) => parts.push(n));
+      } else if (w.includes("roommate") && group) (group as Group).members.forEach((mm) => parts.push(mm.name));
       else if (roster.includes(w)) parts.push(cap(w));
       else if (w.length > 1) {
         parts.push(cap(w));

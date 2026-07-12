@@ -14,7 +14,7 @@ import type { GroupDetail } from "@/lib/api/models/groups/group";
 import { taka } from "./format";
 import { avatarColors, catColor, catIcon, catLabel, type Rel } from "./palette";
 import { Icon } from "./icons";
-import { parse } from "./parse";
+import { buildRunParsePatch } from "./parse-capture";
 import { groupExpenseNotifText, makeNotif, prefillText, resolveInvite } from "./social";
 import { getStoredUser } from "@/lib/auth/auth-storage";
 import type { Draft, Entry, Group, GroupMember, Screen, TallyState } from "./types";
@@ -496,61 +496,25 @@ function createActions(
     onCaptureInput: (v: string) => set((s) => (s.capture ? { capture: { ...s.capture, text: v } } : {})),
     useExample: (txt: string) => set((s) => (s.capture ? { capture: { ...s.capture, mode: "say", text: txt } } : {})),
     runParse: () => {
-      const text = getState().capture?.text || "";
-      if (!text.trim()) {
+      const cap = getState().capture;
+      const text = cap?.text?.trim() || "";
+      if (!text) {
         set(toastPatch("Type what happened first"));
         return;
       }
-      set((s) => {
-        const boundGroup = s.capture?.groupId
-          ? s.groups.find((g) => g.id === s.capture!.groupId)
-          : null;
-        const p = parse(text, s.groups);
-        if (p.lowConf) {
-          return {
-            capture: { ...s.capture!, mode: "manual", stage: "input", amount: "", prefill: { title: p.title, cat: p.cat } },
-            ...toastPatch("Add the amount to finish"),
-          };
-        }
-        if (boundGroup) {
-          const members = boundGroup.members.map((m) => m.name);
-          const roster = new Set(members);
-          const picked = p.parts.filter((n) => roster.has(n));
-          const parts = picked.length ? picked : members.length ? members : ["You"];
-          const payer = roster.has(p.payer) ? p.payer : "You";
-          const finalParts = [...new Set(parts.includes(payer) ? parts : [payer, ...parts])];
-          const draft: Draft = {
-            title: p.title,
-            total: p.amount,
-            payer,
-            parts: finalParts,
-            allMembers: members.length ? members : ["You"],
-            method: "equal",
-            cat: p.cat,
-            group: boundGroup.name,
-            isShared: true,
-            unresolved: (p.unresolved || []).filter((n) => !roster.has(n)),
-            owed: equalOwed(p.amount, finalParts),
-          };
-          return { capture: { ...s.capture!, stage: "draft", draft } };
-        }
-        const allMembers = p.group ? p.group.members.map((m) => m.name) : [...new Set([p.payer, ...p.parts])];
-        const parts = p.parts.length ? p.parts : [p.payer];
-        const draft: Draft = {
-          title: p.title,
-          total: p.amount,
-          payer: p.payer,
-          parts,
-          allMembers,
-          method: "equal",
-          cat: p.cat,
-          group: p.group ? p.group.name : null,
-          isShared: parts.length > 1,
-          unresolved: p.unresolved || [],
-          owed: equalOwed(p.amount, parts),
-        };
-        return { capture: { ...s.capture!, stage: "draft", draft } };
-      });
+      if (cap?.parsing) return;
+
+      set((s) =>
+        s.capture ? { capture: { ...s.capture, parsing: true } } : {},
+      );
+
+      void buildRunParsePatch(getState())
+        .then((patch) => set(patch))
+        .catch(() => {
+          const cur = getState().capture;
+          if (!cur) return;
+          set({ capture: { ...cur, parsing: false }, toast: "Something went wrong" });
+        });
     },
     backToInput: () => set((s) => (s.capture ? { capture: { ...s.capture, stage: "input" } } : {})),
     pressKey: (k: string) =>
@@ -1445,6 +1409,8 @@ function buildView(s: TallyState, a: Actions) {
     captureGroupName: captureGroup?.name || "",
     captureIsGroupExpense: !!cap0?.groupId,
     captureIsEditing: !!cap0?.editingExpenseId,
+    captureParsing: !!cap0?.parsing,
+    captureParseLabel: cap0?.parsing ? "Understanding…" : "Make a draft",
     openGroupExpense: a.openGroupExpense,
     sayBg: cap0?.mode === "say" ? "var(--surface-card)" : "transparent", sayColor: cap0?.mode === "say" ? "var(--ink)" : "var(--muted)",
     manualBg: cap0?.mode === "manual" ? "var(--surface-card)" : "transparent", manualColor: cap0?.mode === "manual" ? "var(--ink)" : "var(--muted)",

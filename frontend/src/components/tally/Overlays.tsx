@@ -47,7 +47,7 @@ export function Capture() {
                 data-testid="capture-text"
                 onChange={(e) => actions.onCaptureInput(e.target.value)}
                 value={vm.captureText}
-                placeholder={vm.captureIsGroupExpense ? "dinner 500, I paid, split me and Alex" : "dinner 500, I paid, split me and Alex"}
+                placeholder={vm.captureIsGroupExpense ? "dinner 960, I paid, split everyone" : "coffee 120"}
                 style={{ width: "100%", marginTop: 14, minHeight: 92, resize: "none", border: "1px solid var(--line-strong)", borderRadius: 16, padding: 15, font: "500 16px var(--font-sans)", color: "var(--ink)", background: "var(--surface-card)", outline: "none", lineHeight: 1.5 }}
               />
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
@@ -56,7 +56,23 @@ export function Capture() {
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 18 }}>
-                <div data-testid="capture-make-draft" onClick={actions.runParse} style={{ flex: 1, background: "var(--chip-on-bg)", color: "var(--chip-on-fg)", textAlign: "center", borderRadius: 16, padding: 17, font: "600 16px var(--font-sans)", cursor: "pointer" }}>Make a draft</div>
+                <div
+                  data-testid="capture-make-draft"
+                  onClick={vm.captureParsing ? undefined : actions.runParse}
+                  style={{
+                    flex: 1,
+                    background: "var(--chip-on-bg)",
+                    color: "var(--chip-on-fg)",
+                    textAlign: "center",
+                    borderRadius: 16,
+                    padding: 17,
+                    font: "600 16px var(--font-sans)",
+                    cursor: vm.captureParsing ? "default" : "pointer",
+                    opacity: vm.captureParsing ? 0.7 : 1,
+                  }}
+                >
+                  {vm.captureParseLabel}
+                </div>
                 <div style={{ width: 54, height: 54, borderRadius: "50%", border: "1px solid var(--line-strong)", background: "var(--surface-card)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: "#C2693E", cursor: "pointer" }}>◉</div>
               </div>
             </div>

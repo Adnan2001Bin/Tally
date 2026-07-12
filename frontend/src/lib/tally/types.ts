@@ -122,6 +122,8 @@ export interface Capture {
   returnScreen?: Screen;
   /** When set, confirm saves changes to this group expense id. */
   editingExpenseId?: string;
+  /** True while the LLM parse request is in flight. */
+  parsing?: boolean;
 }
 
 export type NotifKind = "expense" | "settle" | "dispute" | "group" | "join";

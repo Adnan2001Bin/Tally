@@ -249,7 +249,7 @@ export async function parseExpenseText(
       ],
       temperature: 0,
       seed: 0,
-      max_tokens: 512,
+      max_tokens: 512, // TODO: Subject to test if this is sufficient for most expense parsing scenarios
       response_format: {
         type: "json_schema",
         json_schema: {
