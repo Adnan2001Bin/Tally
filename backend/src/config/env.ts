@@ -20,4 +20,8 @@ export const env = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "7d",
   },
   isProduction: process.env.NODE_ENV === "production",
+  cerebras: {
+    apiKey: process.env.CEREBRAS_API_KEY ?? "",
+    model: process.env.CEREBRAS_MODEL ?? "llama-3.3-70b",
+  },
 } as const;

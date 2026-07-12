@@ -1,10 +1,33 @@
 // Natural-language heuristic fast-path (spec §9): the trivial/local parser that
 // EXTRACTS stated facts only — it never computes money (that is @/lib/core, §10).
-// Ported verbatim from the mockup's parse(). The real LLM path (extract edge fn)
-// returns the same fact shape and is also fed to the core.
+// The Cerebras LLM path returns ParsedExpenseFacts; factsToDraft() feeds the core.
 
+import { computeOwed } from "@/lib/core";
 import { cap } from "./format";
-import type { Group } from "./types";
+import type { Draft, Group } from "./types";
+
+export const EXPENSE_CATEGORIES = [
+  "food",
+  "grocery",
+  "transport",
+  "bills",
+  "fun",
+  "other",
+] as const;
+
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+/** Structured facts from POST /ai/parse-expense (LLM extraction only). */
+export interface ParsedExpenseFacts {
+  description: string;
+  category: ExpenseCategory;
+  total: number;
+  payers: { name: string; amount: number }[];
+  participants: string[];
+  split_method: "equal" | "exact";
+  split_values: Record<string, number> | null;
+  ambiguous_names: string[];
+}
 
 export interface ParsedFacts {
   title: string;
@@ -17,6 +40,68 @@ export interface ParsedFacts {
   isShared: boolean;
   unresolved: string[];
   lowConf: boolean;
+}
+
+function rosterSet(group: Group): Set<string> {
+  return new Set(group.members.map((m) => m.name));
+}
+
+function totalFromFacts(facts: ParsedExpenseFacts): number {
+  const paid = facts.payers.reduce((sum, p) => sum + (p.amount || 0), 0);
+  return paid > 0 ? paid : Math.max(0, facts.total || 0);
+}
+
+function primaryPayerName(
+  facts: ParsedExpenseFacts,
+  roster: Set<string>,
+): string {
+  const onRoster = facts.payers.filter((p) => roster.has(p.name));
+  if (onRoster.length) return onRoster[0].name;
+  if (facts.payers.length) return facts.payers[0].name;
+  return roster.has("You") ? "You" : [...roster][0] ?? "You";
+}
+
+/**
+ * Map LLM-extracted facts → Draft. All split math via @/lib/core (no LLM).
+ */
+export function factsToDraft(facts: ParsedExpenseFacts, group: Group): Draft {
+  const roster = rosterSet(group);
+  const allMembers = group.members.length ? group.members.map((m) => m.name) : ["You"];
+
+  const picked = facts.participants.filter((n) => roster.has(n));
+  const payer = primaryPayerName(facts, roster);
+  let parts = picked.length ? picked : allMembers;
+  if (!parts.includes(payer)) parts = [payer, ...parts];
+  parts = [...new Set(parts)];
+
+  const total = totalFromFacts(facts);
+  const method = facts.split_method === "exact" ? "exact" : "equal";
+
+  let owed: Record<string, number>;
+  if (method === "exact" && facts.split_values) {
+    owed = {};
+    for (const p of parts) {
+      owed[p] = Math.max(0, facts.split_values[p] ?? 0);
+    }
+  } else {
+    owed = computeOwed(total, { method: "equal", participants: parts });
+  }
+
+  const unresolved = facts.ambiguous_names.filter((n) => !roster.has(n));
+
+  return {
+    title: facts.description.trim() || "Expense",
+    total,
+    payer: roster.has(payer) ? payer : "You",
+    parts,
+    allMembers,
+    method,
+    cat: facts.category,
+    group: group.name,
+    isShared: parts.length > 1,
+    unresolved,
+    owed,
+  };
 }
 
 function rosterFromGroups(groups: Group[]): string[] {

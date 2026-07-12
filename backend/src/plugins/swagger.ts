@@ -47,6 +47,12 @@ import {
   updateGroupBodySchema,
   updateMemberBodySchema,
 } from "../modules/groups/groups.schemas.js";
+import {
+  parseExpenseBodySchema,
+  parseExpenseResponseSchema,
+  parseExpenseUnavailableSchema,
+  schemaRef as aiSchemaRef,
+} from "../modules/ai/ai.schemas.js";
 
 const sessionsListSchema = {
   $id: schemaRef.sessionsList,
@@ -250,10 +256,23 @@ export default fp(async (fastify) => {
   fastify.addSchema(groupsListOpenApiSchema);
   fastify.addSchema(joinRequestsListOpenApiSchema);
 
+  fastify.addSchema({
+    $id: aiSchemaRef.parseExpenseBody,
+    ...parseExpenseBodySchema,
+  });
+  fastify.addSchema({
+    $id: aiSchemaRef.parseExpenseResponse,
+    ...parseExpenseResponseSchema,
+  });
+  fastify.addSchema({
+    $id: aiSchemaRef.parseExpenseUnavailable,
+    ...parseExpenseUnavailableSchema,
+  });
+
   await fastify.register(swagger, {
     refResolver: {
       buildLocalReference(json, _baseUri, _fragment, i) {
-        return json.$id || json.title || `def-${i}`;
+        return String(json.$id ?? json.title ?? `def-${i}`);
       },
     },
     openapi: {
@@ -282,6 +301,10 @@ export default fp(async (fastify) => {
           name: "Groups",
           description:
             "Shared expense groups — members, invite links, balances, expenses, settlements",
+        },
+        {
+          name: "AI",
+          description: "Natural-language parsing for expense capture (Cerebras LLM)",
         },
       ],
       components: {
