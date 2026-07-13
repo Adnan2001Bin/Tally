@@ -13,6 +13,7 @@ export interface ParseExpenseUnavailable {
   message: string;
   code: string;
   fallback: boolean;
+  detail?: Record<string, unknown>;
 }
 
 export function isParseFallbackError(error: unknown): boolean {
@@ -27,5 +28,12 @@ export async function parseExpenseText(body: ParseExpenseBody): Promise<ParsedEx
     url: "/ai/parse-expense",
     method: "POST",
     data: body,
+  });
+}
+
+export async function fetchParseStatus(): Promise<{ llm_available: boolean; model: string }> {
+  return customInstance<{ llm_available: boolean; model: string }>({
+    url: "/ai/status",
+    method: "GET",
   });
 }

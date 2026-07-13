@@ -1,5 +1,6 @@
 import axios from "axios";
-import { isParseFallbackError, parseExpenseText } from "@/lib/api/parse-expense";
+import { fetchParseStatus, isParseFallbackError, parseExpenseText } from "@/lib/api/parse-expense";
+import type { ParseExpenseUnavailable } from "@/lib/api/parse-expense";
 import { getAccessToken } from "@/lib/auth/auth-storage";
 import type { Capture, Draft, Group, TallyState } from "./types";
 import { factsToDraft, normalizeGroupSplitParts, parse, type ParsedExpenseFacts } from "./parse";
@@ -158,6 +159,21 @@ export function canUseLlmParse(): boolean {
   return typeof window !== "undefined" && !!getAccessToken();
 }
 
+let llmAvailableCache: boolean | null = null;
+
+async function llmParseEnabled(): Promise<boolean> {
+  if (!canUseLlmParse()) return false;
+  if (llmAvailableCache !== null) return llmAvailableCache;
+  try {
+    const status = await fetchParseStatus();
+    llmAvailableCache = status.llm_available;
+    return status.llm_available;
+  } catch {
+    llmAvailableCache = false;
+    return false;
+  }
+}
+
 /** Build store patch after parsing capture text (LLM with local fallback). */
 export async function buildRunParsePatch(state: TallyState): Promise<Partial<TallyState>> {
   const text = state.capture?.text?.trim() || "";
@@ -169,19 +185,37 @@ export async function buildRunParsePatch(state: TallyState): Promise<Partial<Tal
 
   const { boundGroup, members, groupForDraft } = resolveParseContext(state);
 
-  if (!canUseLlmParse()) {
+  if (!(await llmParseEnabled())) {
     return draftFromHeuristic({ ...state, capture: { ...capture, text } });
   }
 
   try {
     const facts = await parseExpenseText({ text, members, currency_symbol: "৳" });
-    return draftFromFacts(capture, facts, boundGroup, groupForDraft);
+    console.info("[tally/ai] parse-expense ok", {
+      description: facts.description,
+      total: facts.total,
+      participants: facts.participants,
+    });
+    return {
+      ...draftFromFacts(capture, facts, boundGroup, groupForDraft),
+      toast: "✓ AI understood your expense",
+    };
   } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const data = error.response?.data as ParseExpenseUnavailable | undefined;
+      console.warn("[tally/ai] parse-expense failed", {
+        status: error.response?.status,
+        message: data?.message,
+        code: data?.code,
+        detail: data?.detail,
+      });
+    }
     if (isParseFallbackError(error)) {
+      llmAvailableCache = false;
       const msg =
         axios.isAxiosError(error) &&
-        (error.response?.data as { message?: string } | undefined)?.message?.includes("API key")
-          ? "LLM parser offline — add CEREBRAS_API_KEY to backend/.env"
+        (error.response?.data as { message?: string } | undefined)?.message?.includes("deprecated")
+          ? "LLM model unavailable — restart backend after updating CEREBRAS_MODEL"
           : "Used offline parser";
       return {
         ...draftFromHeuristic({ ...state, capture: { ...capture, text } }),

@@ -47,7 +47,7 @@ export function Capture() {
                 data-testid="capture-text"
                 onChange={(e) => actions.onCaptureInput(e.target.value)}
                 value={vm.captureText}
-                placeholder={vm.captureIsGroupExpense ? "dinner 960, I paid, split everyone" : "coffee 120"}
+                placeholder={vm.captureIsGroupExpense ? "dinner 960, I paid, split everyone — or breakfast 1000, Adnan 500 Arif 300 me 200" : "coffee 120"}
                 style={{ width: "100%", marginTop: 14, minHeight: 92, resize: "none", border: "1px solid var(--line-strong)", borderRadius: 16, padding: 15, font: "500 16px var(--font-sans)", color: "var(--ink)", background: "var(--surface-card)", outline: "none", lineHeight: 1.5 }}
               />
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>

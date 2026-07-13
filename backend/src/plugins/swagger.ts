@@ -268,6 +268,16 @@ export default fp(async (fastify) => {
     $id: aiSchemaRef.parseExpenseUnavailable,
     ...parseExpenseUnavailableSchema,
   });
+  fastify.addSchema({
+    $id: aiSchemaRef.parseStatus,
+    type: "object",
+    required: ["llm_available", "model"],
+    additionalProperties: false,
+    properties: {
+      llm_available: { type: "boolean" },
+      model: { type: "string" },
+    },
+  });
 
   await fastify.register(swagger, {
     refResolver: {

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { ref } from "../../../plugins/swagger.js";
+import { env } from "../../../config/env.js";
 import {
   aiOperationIds,
   aiTag,
@@ -34,19 +35,38 @@ export function parseExpenseRoute(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const log = request.log;
+      const body = request.body as ParseExpenseRequest;
+      log.info(
+        {
+          userId: request.user?.sub,
+          textLength: body.text?.length ?? 0,
+          memberCount: body.members?.length ?? 0,
+        },
+        "[ai] POST /parse-expense",
+      );
       try {
-        const body = request.body as ParseExpenseRequest;
-        const result = await parseExpenseText(body);
+        const result = await parseExpenseText(body, log);
         return reply.send(result);
       } catch (error) {
         if (error instanceof ParseExpenseUnavailableError) {
+          log.error(
+            {
+              message: error.message,
+              detail: error.detail,
+              model: env.cerebras.model,
+            },
+            "[ai] POST /parse-expense → 503",
+          );
           return reply.code(error.statusCode).send({
             error: "ServiceUnavailable",
             message: error.message,
             code: error.code,
             fallback: error.fallback,
+            ...(env.isProduction ? {} : { detail: error.detail }),
           });
         }
+        log.error({ err: error }, "[ai] POST /parse-expense → unexpected error");
         throw error;
       }
     },

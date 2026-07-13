@@ -5,12 +5,14 @@ export const bearerAuthSecurity = [{ bearerAuth: [] }] as const;
 
 export const aiOperationIds = {
   parseExpense: "parseExpense",
+  parseStatus: "parseStatus",
 } as const;
 
 export const schemaRef = {
   parseExpenseBody: "ParseExpenseBody",
   parseExpenseResponse: "ParseExpenseResponse",
   parseExpenseUnavailable: "ParseExpenseUnavailable",
+  parseStatus: "ParseStatus",
 } as const;
 
 export const parseExpenseBodySchema = {
@@ -79,11 +81,12 @@ export const parseExpenseResponseSchema = {
 export const parseExpenseUnavailableSchema = {
   type: "object",
   required: ["error", "message", "code", "fallback"],
-  additionalProperties: false,
+  additionalProperties: true,
   properties: {
     error: { type: "string" },
     message: { type: "string" },
     code: { type: "string" },
     fallback: { type: "boolean" },
+    detail: { type: "object", additionalProperties: true },
   },
 } as const;

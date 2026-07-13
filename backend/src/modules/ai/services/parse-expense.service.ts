@@ -7,6 +7,8 @@ import type {
 import { EXPENSE_CATEGORIES } from "../ai.types.js";
 import { CerebrasError, cerebrasChatCompletion } from "./cerebras.client.js";
 import { env } from "../../../config/env.js";
+import type { AiDebugLogger } from "./ai-debug.js";
+import { silentAiLog, truncate } from "./ai-debug.js";
 
 const EXPENSE_PARSE_JSON_SCHEMA = {
   type: "object",
@@ -23,7 +25,7 @@ const EXPENSE_PARSE_JSON_SCHEMA = {
   properties: {
     description: { type: "string" },
     category: { type: "string", enum: [...EXPENSE_CATEGORIES] },
-    total: { type: ["number", "null"] },
+    total: { type: "number" },
     payers: {
       type: "array",
       items: {
@@ -42,7 +44,8 @@ const EXPENSE_PARSE_JSON_SCHEMA = {
     },
     split_method: { type: "string", enum: ["equal", "exact"] },
     split_values: {
-      type: ["object", "null"],
+      type: "object",
+      properties: {},
       additionalProperties: { type: "number" },
     },
   },
@@ -51,11 +54,11 @@ const EXPENSE_PARSE_JSON_SCHEMA = {
 interface LlmParseResult {
   description: string;
   category: string;
-  total: number | null;
+  total: number;
   payers: { name: string; amount: number }[];
   participants: string[];
   split_method: SplitMethod;
-  split_values: Record<string, number> | null;
+  split_values: Record<string, number>;
 }
 
 function buildSystemPrompt(members: string[], currencySymbol: string): string {
@@ -77,14 +80,30 @@ CATEGORIES (pick exactly one):
 
 RULES:
 1. "me", "I", "my" → name "You"
-2. "everyone", "all", "roommates" → all members listed above
+2. "everyone", "all", "roommates" → all members listed above, split_method "equal"
 3. If split not mentioned for a group expense → all members, equal split
-4. If per-person amounts are stated → split_method "exact" with split_values keyed by member name
-5. If only one payer mentioned with full amount → one entry in payers
-6. description: short title from the expense (not the full sentence)
-7. Do not compute equal splits — only extract stated per-person amounts for exact splits
-8. total: sum of payer amounts when known; null only if amounts are unclear
-9. split_values must be null when split_method is "equal"
+4. If per-person owed amounts are stated → split_method "exact" with split_values keyed by member name (numbers = each person's SHARE of the bill, NOT cash they paid at the counter)
+5. "I paid" / "Adnan paid" without a number → that person paid the FULL total. "I paid 200" means they paid ৳200 cash — do NOT treat that as their share unless they clearly mean share
+6. If only one payer mentioned with full amount → one entry in payers for the full total
+7. description: short title from the expense (not the full sentence)
+8. Do not compute equal splits yourself — only extract stated per-person amounts for exact splits
+9. total: expense bill amount (from text or sum of payer amounts when one payer paid full amount)
+10. split_values: use {} when split_method is "equal"
+11. participants: everyone who shares the cost (all keys in split_values for exact splits)
+12. If no payer is stated but total is known → assume "You" paid the full total
+
+EXACT SPLIT — name + amount pairs are SHARES (what each person owes):
+- "breakfast 1000, Adnan 500 Arif 300 me 200" → exact, payers: You paid 1000, split_values as stated
+- "breakfast 1000, I paid, Adnan 500 Arif 300 me 200" → same (I paid = You paid full 1000)
+- "split Adnan 500 Arif 300 me 200" → exact with those shares
+- Keywords: "split exact", "custom split", name + amount pairs
+
+EQUAL SPLIT — use when user says everyone/equally without per-person amounts:
+- "split everyone", "split equally", "split all" → equal, split_values: {}
+
+EXAMPLES:
+- "dinner 960, I paid, split everyone" → equal, You paid 960, all members
+- "breakfast 1000, Adnan 500 Arif 300 me 200" → exact, You paid 1000 (default), shares as stated
 
 Respond with JSON matching the provided schema.`;
 }
@@ -180,10 +199,15 @@ function postProcess(
     payers.push({ name: members.includes("You") ? "You" : members[0], amount: total });
   }
 
-  const split_method: SplitMethod = raw.split_method === "exact" ? "exact" : "equal";
+  const split_method: SplitMethod =
+    raw.split_method === "exact" &&
+    raw.split_values &&
+    Object.keys(raw.split_values).length > 0
+      ? "exact"
+      : "equal";
   let split_values: Record<string, number> | null = null;
   const splitAmbiguous: string[] = [];
-  if (split_method === "exact" && raw.split_values) {
+  if (split_method === "exact" && raw.split_values && Object.keys(raw.split_values).length > 0) {
     split_values = {};
     for (const [name, amount] of Object.entries(raw.split_values)) {
       const matched = matchRosterName(name, members);
@@ -218,15 +242,18 @@ export class ParseExpenseUnavailableError extends Error {
   readonly statusCode = 503;
   readonly code = "PARSE_UNAVAILABLE";
   readonly fallback = true;
+  readonly detail?: Record<string, unknown>;
 
-  constructor(message = "Expense parsing is temporarily unavailable") {
+  constructor(message = "Expense parsing is temporarily unavailable", detail?: Record<string, unknown>) {
     super(message);
     this.name = "ParseExpenseUnavailableError";
+    this.detail = detail;
   }
 }
 
 export async function parseExpenseText(
   input: ParseExpenseRequest,
+  log: AiDebugLogger = silentAiLog,
 ): Promise<ParseExpenseResponse> {
   const text = input.text.trim();
   const members = input.members.map((m) => m.trim()).filter(Boolean);
@@ -239,39 +266,84 @@ export async function parseExpenseText(
 
   const currencySymbol = input.currency_symbol?.trim() || "৳";
 
-  let content: string;
-  try {
-    content = await cerebrasChatCompletion({
+  log.info(
+    {
+      textPreview: truncate(text, 120),
+      textLength: text.length,
+      members,
       model: env.cerebras.model,
-      messages: [
-        { role: "system", content: buildSystemPrompt(members, currencySymbol) },
-        { role: "user", content: text },
-      ],
-      temperature: 0,
-      seed: 0,
-      max_tokens: 512, // TODO: Subject to test if this is sufficient for most expense parsing scenarios
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "expense_parse",
-          strict: true,
-          schema: EXPENSE_PARSE_JSON_SCHEMA,
-        },
+      currencySymbol,
+    },
+    "[ai] parse-expense start",
+  );
+
+  let content: string;
+  const cerebrasRequest = {
+    model: env.cerebras.model,
+    messages: [
+      { role: "system" as const, content: buildSystemPrompt(members, currencySymbol) },
+      { role: "user" as const, content: text },
+    ],
+    temperature: 0,
+    seed: 0,
+    max_tokens: 512,
+    response_format: {
+      type: "json_schema" as const,
+      json_schema: {
+        name: "expense_parse",
+        strict: false,
+        schema: EXPENSE_PARSE_JSON_SCHEMA,
       },
-    });
-  } catch (error) {
-    if (error instanceof CerebrasError) {
-      throw new ParseExpenseUnavailableError(error.message);
+    },
+  };
+
+  try {
+    content = await cerebrasChatCompletion(cerebrasRequest, log);
+  } catch (firstError) {
+    if (firstError instanceof CerebrasError) {
+      log.error({ message: firstError.message, cerebras: firstError.detail }, "[ai] parse-expense cerebras failed");
+      throw new ParseExpenseUnavailableError(firstError.message, { cerebras: firstError.detail });
     }
-    throw error;
+    throw firstError;
   }
 
   let parsed: LlmParseResult;
   try {
     parsed = JSON.parse(content) as LlmParseResult;
-  } catch {
-    throw new ParseExpenseUnavailableError("Could not parse model response");
+    log.info(
+      {
+        description: parsed.description,
+        category: parsed.category,
+        total: parsed.total,
+        payerCount: parsed.payers?.length ?? 0,
+        participantCount: parsed.participants?.length ?? 0,
+        split_method: parsed.split_method,
+      },
+      "[ai] parse-expense JSON ok",
+    );
+  } catch (parseErr) {
+    log.error(
+      {
+        contentPreview: truncate(content, 500),
+        err: parseErr instanceof Error ? parseErr.message : String(parseErr),
+      },
+      "[ai] parse-expense JSON parse failed",
+    );
+    throw new ParseExpenseUnavailableError("Could not parse model response", {
+      contentPreview: truncate(content, 500),
+    });
   }
 
-  return postProcess(parsed, members, text);
+  const result = postProcess(parsed, members, text);
+  log.info(
+    {
+      description: result.description,
+      total: result.total,
+      category: result.category,
+      participants: result.participants,
+      ambiguous_names: result.ambiguous_names,
+    },
+    "[ai] parse-expense done",
+  );
+  return result;
 }

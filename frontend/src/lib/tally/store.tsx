@@ -1231,7 +1231,7 @@ function buildView(s: TallyState, a: Actions) {
     cap0?.groupId
       ? [
           { label: "dinner 960", txt: "dinner 960, I paid, split everyone" },
-          { label: "groceries 1200", txt: "groceries 1200, split equally" },
+          { label: "custom split", txt: "breakfast 1000, Adnan 500 Arif 300 me 200" },
           { label: "uber 350", txt: "uber 350, Alex paid" },
         ]
       : [

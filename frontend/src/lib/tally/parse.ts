@@ -75,13 +75,17 @@ export function factsToDraft(facts: ParsedExpenseFacts, group: Group): Draft {
   parts = [...new Set(parts)];
 
   const total = totalFromFacts(facts);
-  const method = facts.split_method === "exact" ? "exact" : "equal";
+  const hasCustomSplit =
+    facts.split_method === "exact" &&
+    facts.split_values != null &&
+    Object.keys(facts.split_values).length > 0;
+  const method: "equal" | "exact" = hasCustomSplit ? "exact" : "equal";
 
   let owed: Record<string, number>;
-  if (method === "exact" && facts.split_values) {
+  if (hasCustomSplit) {
     owed = {};
     for (const p of parts) {
-      owed[p] = Math.max(0, facts.split_values[p] ?? 0);
+      owed[p] = Math.max(0, facts.split_values![p] ?? 0);
     }
   } else {
     owed = computeOwed(total, { method: "equal", participants: parts });
